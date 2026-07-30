@@ -24,7 +24,7 @@ blink {
     softDepend.set(listOf(
         "MythicMobs", "AttributePlus", "Adyeshach",
         "PlaceholderAPI", "ModelEngine", "PlayerPoints",
-        "Vault", "NeigeItems", "TrMenu"
+        "Vault", "NeigeItems", "TrMenu", "Rondo"
     ))
     enableScript.set(true)
     enableAria.set(true)
@@ -63,6 +63,9 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("org.black_ixx:playerpoints:3.2.7")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
+
+    // 生态兼容
+    compileOnly("priv.seventeen.artist:rondo:1.0.0")
 
     // 无公共 Maven 仓库的插件
     compileOnly(files("libs/AttributePlus-3.3.3.0.jar"))

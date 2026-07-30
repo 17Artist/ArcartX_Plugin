@@ -15,6 +15,7 @@ import priv.seventeen.artist.arcartx.commons.link.attribute.AttributePlusOldProv
 import priv.seventeen.artist.arcartx.commons.link.attribute.AttributePlusProvider
 import priv.seventeen.artist.arcartx.commons.link.attribute.CraneAttributeProvider
 import priv.seventeen.artist.arcartx.commons.link.economy.PlayerPointsEconomyProvider
+import priv.seventeen.artist.arcartx.commons.link.economy.RondoLinker
 import priv.seventeen.artist.arcartx.commons.link.economy.VaultEconomyProvider
 import priv.seventeen.artist.arcartx.commons.link.item.MythicMobsItemProvider
 import priv.seventeen.artist.arcartx.commons.link.item.NeigeItemsItemProvider
@@ -58,6 +59,11 @@ object BuiltInLinker {
         if(Bukkit.getPluginManager().getPlugin("PlayerPoints") != null) {
             ArcartXLinkManager.registerEconomyProvider(PlayerPointsEconomyProvider())
             bukkitPlugin.sendMessage(L(AXLanguageKey.FOUND_PLAYER_POINTS))
+        }
+        val rondo = Bukkit.getPluginManager().getPlugin("Rondo")
+        if (rondo != null && rondo.isEnabled) {
+            val registered = RondoLinker.registerEconomyProviders()
+            bukkitPlugin.sendMessage(L(AXLanguageKey.FOUND_RONDO, registered.toString()))
         }
 
         // 物品

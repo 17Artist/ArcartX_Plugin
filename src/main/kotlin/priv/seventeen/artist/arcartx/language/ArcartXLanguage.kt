@@ -58,6 +58,7 @@ enum class AXLanguageKey(var message: String): LanguageKey {
     FOUND_CRANE_ATTRIBUTE("&a发现CraneAttribute插件，注册属性提供器"),
     FOUND_VAULT("&a发现Vault插件，注册经济提供器"),
     FOUND_PLAYER_POINTS("&a发现PlayerPoints插件，注册经济提供器"),
+    FOUND_RONDO("&a发现Rondo插件，注册{0}个货币经济提供器"),
     FOUND_NEIGE_ITEMS("&a发现NeigeItems插件，注册物品提供器"),
     FOUND_MYTHICMOBS_ITEM("&a发现MythicMobs插件，注册物品提供器"),
     FOUND_MYTHICMOBS("&a发现MythicMobs插件，注册相关功能"),
