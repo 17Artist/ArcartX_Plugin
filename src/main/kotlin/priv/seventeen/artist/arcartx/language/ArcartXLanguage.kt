@@ -61,6 +61,8 @@ enum class AXLanguageKey(var message: String): LanguageKey {
     FOUND_RONDO("&a发现Rondo插件，注册{0}个货币经济提供器"),
     FOUND_NEIGE_ITEMS("&a发现NeigeItems插件，注册物品提供器"),
     FOUND_MYTHICMOBS_ITEM("&a发现MythicMobs插件，注册物品提供器"),
+    FOUND_OVERTURE("&a发现Overture插件，注册物品提供器与{0}项物品Meta"),
+    OVERTURE_INTEGRATION_FAILED("&cOverture兼容扩展注册失败: {0}"),
     FOUND_MYTHICMOBS("&a发现MythicMobs插件，注册相关功能"),
     FOUND_MODEL_ENGINE("&a发现ModelEngine插件，碰撞体积处理器-兼容模式"),
     FOUND_ADYESHACH("&a发现Adyeshach插件，加载模型以及虚拟碰撞体积"),

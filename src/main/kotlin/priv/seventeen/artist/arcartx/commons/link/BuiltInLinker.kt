@@ -18,7 +18,9 @@ import priv.seventeen.artist.arcartx.commons.link.economy.PlayerPointsEconomyPro
 import priv.seventeen.artist.arcartx.commons.link.economy.RondoLinker
 import priv.seventeen.artist.arcartx.commons.link.economy.VaultEconomyProvider
 import priv.seventeen.artist.arcartx.commons.link.item.MythicMobsItemProvider
+import priv.seventeen.artist.arcartx.commons.link.item.OvertureItemProvider
 import priv.seventeen.artist.arcartx.commons.link.item.NeigeItemsItemProvider
+import priv.seventeen.artist.arcartx.commons.link.overture.OvertureLinker
 import priv.seventeen.artist.arcartx.language.AXLanguageKey
 import priv.seventeen.artist.arcartx.language.L
 import priv.seventeen.artist.arcartx.commons.message.ArcartXSender.Companion.sendMessage
@@ -28,6 +30,21 @@ import priv.seventeen.artist.blink.lifecycle.LifeCycle
 
 /** 内置插件集成注册器 */
 object BuiltInLinker {
+
+    @Awake(LifeCycle.LOAD)
+    fun loadOvertureExtensions() {
+        if (Bukkit.getPluginManager().getPlugin("Overture") == null) return
+        runCatching {
+            OvertureLinker.registerMetaExtensions()
+        }.onFailure { error ->
+            bukkitPlugin.sendMessage(
+                L(
+                    AXLanguageKey.OVERTURE_INTEGRATION_FAILED,
+                    error.message ?: error.javaClass.simpleName
+                )
+            )
+        }
+    }
 
     @Awake(LifeCycle.ACTIVE)
     fun loadAttributeProvider() {
@@ -75,8 +92,19 @@ object BuiltInLinker {
             ArcartXLinkManager.registerItemProvider(MythicMobsItemProvider())
             bukkitPlugin.sendMessage(L(AXLanguageKey.FOUND_MYTHICMOBS_ITEM))
         }
+        val overture = Bukkit.getPluginManager().getPlugin("Overture")
+        if (overture != null && overture.isEnabled) {
+            ArcartXLinkManager.registerItemProvider(OvertureItemProvider())
+            bukkitPlugin.sendMessage(
+                L(AXLanguageKey.FOUND_OVERTURE, OvertureLinker.registeredMetaCount.toString())
+            )
+        }
     }
 
-
+    @Awake(LifeCycle.DISABLE)
+    fun unloadOvertureExtensions() {
+        if (Bukkit.getPluginManager().getPlugin("Overture") == null) return
+        OvertureLinker.unregisterMetaExtensions()
+    }
 
 }
