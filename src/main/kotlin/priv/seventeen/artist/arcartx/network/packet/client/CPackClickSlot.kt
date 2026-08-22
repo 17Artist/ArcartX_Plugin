@@ -79,8 +79,8 @@ class CPackClickSlot() : ClientPacket {
                     } else {
                         sendBack.amount -= addAmount
                     }
-                    aPlayer?.setSlotItemStack(slotName, slotItemStack)
                     player.setItemOnCursor(sendBack)
+                    aPlayer?.setSlotItemStack(slotName, slotItemStack)
                 }
             }
 
@@ -93,13 +93,13 @@ class CPackClickSlot() : ClientPacket {
                 } else {
                     sendBack.amount -= 1
                 }
-                aPlayer?.setSlotItemStack(slotName, newItem)
                 player.setItemOnCursor(sendBack)
+                aPlayer?.setSlotItemStack(slotName, newItem)
             }
 
             REPLACE -> {
-                aPlayer?.setSlotItemStack(slotName, mouseItemStack)
                 player.setItemOnCursor(slotItemStack)
+                aPlayer?.setSlotItemStack(slotName, mouseItemStack)
             }
 
             GET_HALF -> {
@@ -109,8 +109,8 @@ class CPackClickSlot() : ClientPacket {
                 val sendBack = slotItemStack.clone()
                 sendBack.amount = amount1
 
-                aPlayer?.setSlotItemStack(slotName, slotItemStack)
                 player.setItemOnCursor(sendBack)
+                aPlayer?.setSlotItemStack(slotName, slotItemStack)
             }
 
             ADD_ONE -> {
@@ -123,8 +123,8 @@ class CPackClickSlot() : ClientPacket {
                 } else {
                     sendBack.amount -= 1
                 }
-                aPlayer?.setSlotItemStack(slotName, slotItemStack)
                 player.setItemOnCursor(sendBack)
+                aPlayer?.setSlotItemStack(slotName, slotItemStack)
             }
 
             NONE -> {
