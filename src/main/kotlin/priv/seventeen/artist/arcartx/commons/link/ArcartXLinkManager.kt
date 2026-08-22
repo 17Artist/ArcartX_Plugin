@@ -10,11 +10,14 @@
 package priv.seventeen.artist.arcartx.commons.link
 
 import org.bukkit.Bukkit
+import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Player
 import priv.seventeen.artist.arcartx.commons.link.attribute.AttributeProvider
 import priv.seventeen.artist.arcartx.commons.link.economy.EconomyProvider
 import priv.seventeen.artist.arcartx.commons.link.item.ItemProvider
 import priv.seventeen.artist.arcartx.commons.link.papi.AXPlaceholder
 import priv.seventeen.artist.arcartx.commons.link.papi.PlaceholderHooker
+import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 
 /** 第三方插件集成管理器 */
 object ArcartXLinkManager {
@@ -43,6 +46,13 @@ object ArcartXLinkManager {
 
     fun getAttributeProvider(name: String): AttributeProvider? {
         return attributeProviders[name]
+    }
+
+    fun refreshAttributeItems(livingEntity: LivingEntity, providerIdentifier: String): Int {
+        check(Bukkit.isPrimaryThread()) { "Extra-slot item refresh must run on the Bukkit primary thread" }
+        val player = livingEntity as? Player ?: return 0
+        val provider = attributeProviders[providerIdentifier] ?: return 0
+        return ArcartXEntityManager.getPlayer(player)?.refreshAttributeSlotItems(providerIdentifier, provider) ?: 0
     }
 
     fun getEconomyProvider(name: String): EconomyProvider? {

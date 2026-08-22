@@ -103,8 +103,7 @@ fun onSlotUpdateAttribute(event: PlayerExtraSlotUpdateEvent) {
     ArcartX.configs.slotFolder.setting[event.slotID]?.attribute?.let { attr ->
         ArcartXLinkManager.getAttributeProvider(attr)?.apply {
             val sourceID = "ArcartX_Slot_" + event.slotID
-            removeAttribute(event.player, sourceID)
-            addAttribute(event.player, sourceID, event.itemStack)
+            replaceAttribute(event.player, sourceID, event.itemStack)
         }
     }
 }

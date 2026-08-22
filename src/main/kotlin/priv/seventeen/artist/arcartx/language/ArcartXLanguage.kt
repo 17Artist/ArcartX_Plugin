@@ -56,6 +56,8 @@ enum class AXLanguageKey(var message: String): LanguageKey {
     FOUND_ATTRIBUTE_PLUS_OLD("&a发现AttributePlus插件(旧版)，注册属性提供器"),
     FOUND_ATTRIBUTE_PLUS("&a发现AttributePlus插件，注册属性提供器"),
     FOUND_CRANE_ATTRIBUTE("&a发现CraneAttribute插件，注册属性提供器"),
+    FOUND_SYMPHONY("&a发现Symphony插件，注册额外槽位属性兼容"),
+    SYMPHONY_INTEGRATION_FAILED("&cSymphony属性兼容处理失败：{0}"),
     FOUND_VAULT("&a发现Vault插件，注册经济提供器"),
     FOUND_PLAYER_POINTS("&a发现PlayerPoints插件，注册经济提供器"),
     FOUND_RONDO("&a发现Rondo插件，注册{0}个货币经济提供器"),

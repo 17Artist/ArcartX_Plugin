@@ -1,5 +1,5 @@
 Slot1: # 配置项名作为ID 不要重复
-  attribute: "none" # 槽位属性 当前支持：none(不启用槽位属性)、AttributePlus（启用AttributePlus属性支持 需要AttributePlus3.0+）
+  attribute: "none" # 槽位属性示例：none、Symphony、AttributePlus；使用 Symphony 时物品会成为独立外部属性与套装来源
   limit: # 槽位限制，请查看脚本如何使用以了解这里如何填写，无限制可以删除该配置项
     - "检测玩家等级{level = 10}"
   update: # 槽位物品更新后执行的脚本，请查看脚本如何使用以了解这里如何填写，无需执行脚本可以删除该配置项

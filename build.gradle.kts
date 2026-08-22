@@ -19,12 +19,12 @@ blink {
     version.set(project.version.toString())
     description.set("ArcartX Plugin")
     authors.set(listOf("17Artist"))
-    apiVersion.set("1.20")
+    apiVersion.set("1.18")
     packageName.set("priv.seventeen.artist.arcartx")
     softDepend.set(listOf(
         "MythicMobs", "AttributePlus", "Adyeshach",
         "PlaceholderAPI", "ModelEngine", "PlayerPoints",
-        "Vault", "NeigeItems", "TrMenu", "Rondo", "Overture"
+        "Vault", "NeigeItems", "TrMenu", "Rondo", "Overture", "Symphony"
     ))
     enableScript.set(true)
     enableAria.set(true)
@@ -67,6 +67,7 @@ dependencies {
     // 生态兼容
     compileOnly("priv.seventeen.artist:rondo:1.0.0")
     compileOnly("priv.seventeen.artist.overture:overture:1.0.0")
+    compileOnly("priv.seventeen.artist.symphony:symphony:1.0.0")
 
     // 无公共 Maven 仓库的插件
     compileOnly(files("libs/AttributePlus-3.3.3.0.jar"))
@@ -89,8 +90,8 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.24")
     compileOnly("org.projectlombok:lombok:1.18.24")
 
-    // 单元测试（仅覆盖不依赖 Bukkit 的纯逻辑模块）
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("priv.seventeen.artist.symphony:symphony:1.0.0")
 }
 
 tasks.withType<Test> {

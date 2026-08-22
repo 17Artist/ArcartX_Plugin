@@ -23,4 +23,13 @@ interface AttributeProvider {
 
     fun removeAttribute(livingEntity: LivingEntity, sourceID: String)
 
+
+    fun replaceAttribute(livingEntity: LivingEntity, sourceID: String, itemStack: ItemStack) {
+        removeAttribute(livingEntity, sourceID)
+        addAttribute(livingEntity, sourceID, itemStack)
+    }
+
+
+    fun rebuildItem(livingEntity: LivingEntity, sourceID: String, itemStack: ItemStack): ItemStack = itemStack
+
 }

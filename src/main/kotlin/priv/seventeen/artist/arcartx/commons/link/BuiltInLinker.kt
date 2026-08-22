@@ -14,6 +14,7 @@ import priv.seventeen.artist.arcartx.commons.link.attribute.AstraXHeroProvider
 import priv.seventeen.artist.arcartx.commons.link.attribute.AttributePlusOldProvider
 import priv.seventeen.artist.arcartx.commons.link.attribute.AttributePlusProvider
 import priv.seventeen.artist.arcartx.commons.link.attribute.CraneAttributeProvider
+import priv.seventeen.artist.arcartx.commons.link.attribute.SymphonyLinker
 import priv.seventeen.artist.arcartx.commons.link.economy.PlayerPointsEconomyProvider
 import priv.seventeen.artist.arcartx.commons.link.economy.RondoLinker
 import priv.seventeen.artist.arcartx.commons.link.economy.VaultEconomyProvider
@@ -46,8 +47,8 @@ object BuiltInLinker {
         }
     }
 
-    @Awake(LifeCycle.ACTIVE)
-    fun loadAttributeProvider() {
+    @Awake(LifeCycle.ENABLE, priority = 1)
+    fun loadProvider() {
         // 属性
         if (Bukkit.getPluginManager().getPlugin("AstraXHero") != null) {
             ArcartXLinkManager.registerAttributeProvider(AstraXHeroProvider())
@@ -66,6 +67,20 @@ object BuiltInLinker {
         if (Bukkit.getPluginManager().getPlugin("CraneAttribute") != null) {
             ArcartXLinkManager.registerAttributeProvider(CraneAttributeProvider())
             bukkitPlugin.sendMessage(L(AXLanguageKey.FOUND_CRANE_ATTRIBUTE))
+        }
+        val symphony = Bukkit.getPluginManager().getPlugin("Symphony")
+        if (symphony != null && symphony.isEnabled) {
+            runCatching {
+                check(SymphonyLinker.install { reason ->
+                    bukkitPlugin.sendMessage(L(AXLanguageKey.SYMPHONY_INTEGRATION_FAILED, reason))
+                }) { "SymphonyApi 服务尚未注册" }
+            }.onSuccess {
+                bukkitPlugin.sendMessage(L(AXLanguageKey.FOUND_SYMPHONY))
+            }.onFailure { error ->
+                bukkitPlugin.sendMessage(
+                    L(AXLanguageKey.SYMPHONY_INTEGRATION_FAILED, error.message ?: error.javaClass.simpleName)
+                )
+            }
         }
 
         // 经济

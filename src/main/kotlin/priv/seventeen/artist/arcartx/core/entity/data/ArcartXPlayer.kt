@@ -13,6 +13,7 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import priv.seventeen.artist.arcartx.ArcartX
+import priv.seventeen.artist.arcartx.commons.link.attribute.AttributeProvider
 import priv.seventeen.artist.arcartx.core.config.area.Area
 import priv.seventeen.artist.arcartx.core.effect.data.EffectPosition
 import priv.seventeen.artist.arcartx.core.effect.data.WorldTextureBuilder
@@ -272,21 +273,47 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     }
 
     fun setSlotItemStack(slotID: String, itemStack: ItemStack){
-        slotCache[slotID] = itemStack
-        // 主线程序列化（NMS 安全）后异步落库，避免主线程阻塞在 DB 往返上
-        ArcartX.databaseManager?.slotDatabase?.let { db ->
-            val json = db.serializeItemStack(itemStack)
-            AsteroidScheduler.runAsync(bukkitPlugin, Runnable {
-                db.setSlotDataJson(player.uniqueId, slotID, json)
-            })
-        }
-        setSlotItemStackOnlyClient(slotID, itemStack)
+        setSlotItemStackSnapshot(slotID, itemStack)
         PlayerExtraSlotUpdateEvent(player,slotID,itemStack).call()
         ArcartX.configs.slotFolder.setting[slotID]?.updateScriptArgs?.let {
             it.forEach{ arg ->
                 ScriptManager.executeScript(arg.first, player, itemStack,arg.second)
             }
         }
+    }
+
+
+    fun refreshAttributeSlotItems(providerIdentifier: String, provider: AttributeProvider): Int {
+        var changed = 0
+        slotCache.keys.toList().sorted().forEach { slotID ->
+            if (ArcartX.configs.slotFolder.setting[slotID]?.attribute != providerIdentifier) return@forEach
+            val current = slotCache[slotID]?.takeUnless { it.type.isAir } ?: return@forEach
+            val rebuilt = provider.rebuildItem(player, "ArcartX_Slot_$slotID", current.clone())
+            require(rebuilt.amount == current.amount) {
+                "Attribute provider $providerIdentifier changed stack amount while rebuilding extra slot $slotID"
+            }
+            require(!rebuilt.type.isAir) {
+                "Attribute provider $providerIdentifier erased extra slot $slotID while rebuilding its presentation"
+            }
+            if (rebuilt != current) {
+                setSlotItemStackSnapshot(slotID, rebuilt)
+                changed++
+            }
+        }
+        return changed
+    }
+
+    private fun setSlotItemStackSnapshot(slotID: String, itemStack: ItemStack){
+        val snapshot = itemStack.clone()
+        slotCache[slotID] = snapshot
+        // 主线程序列化（NMS 安全）后异步落库，避免主线程阻塞在 DB 往返上
+        ArcartX.databaseManager?.slotDatabase?.let { db ->
+            val json = db.serializeItemStack(snapshot)
+            AsteroidScheduler.runAsync(bukkitPlugin, Runnable {
+                db.setSlotDataJson(player.uniqueId, slotID, json)
+            })
+        }
+        setSlotItemStackOnlyClient(slotID, snapshot)
     }
 
     fun syncSlotCacheToClient(){
