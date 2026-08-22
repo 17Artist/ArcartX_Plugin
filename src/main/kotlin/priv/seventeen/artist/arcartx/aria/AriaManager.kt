@@ -31,6 +31,7 @@ object AriaManager {
             val manager = CallableManager.INSTANCE
             manager.registerObjectFunction(PlayerInfo::class.java)
             manager.registerObjectFunction(PlayerMessage::class.java)
+            manager.registerObjectFunction(PlayerFirstPersonAnimation::class.java)
             manager.registerObjectFunction(EntityMovement::class.java)
             manager.registerObjectFunction(EntityInfo::class.java)
             manager.registerObjectFunction(EntityEffect::class.java)
