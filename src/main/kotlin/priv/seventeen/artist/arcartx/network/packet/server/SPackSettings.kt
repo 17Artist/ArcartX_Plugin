@@ -11,6 +11,7 @@ package priv.seventeen.artist.arcartx.network.packet.server
 
 import com.google.gson.annotations.SerializedName
 import priv.seventeen.artist.arcartx.ArcartX
+import priv.seventeen.artist.arcartx.core.chatcard.ArcartXChatCardRegistry
 import priv.seventeen.artist.arcartx.core.config.animation.Controller
 import priv.seventeen.artist.arcartx.core.config.bossbar.BossBar
 import priv.seventeen.artist.arcartx.core.config.camera.CameraElement
@@ -57,7 +58,7 @@ class SPackSettings : ServerPacket {
     private val tipData: Collection<Tip> = ArcartX.configs.tipFolder.configs.values
 
     @SerializedName("chat_card")
-    private val chatCardData: Collection<ChatCard> = ArcartX.configs.chatCardFolder.configs.values
+    private val chatCardData: Collection<ChatCard> = ArcartXChatCardRegistry.registeredChatCards.values
 
     @SerializedName("boss_bar")
     private val bossBarData: Collection<BossBar> = ArcartX.configs.bossBarFolder.configs.values

@@ -15,6 +15,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import priv.seventeen.artist.arcartx.ArcartX
 import priv.seventeen.artist.arcartx.core.config.camera.CameraElement
+import priv.seventeen.artist.arcartx.core.config.card.ChatCard
 import priv.seventeen.artist.arcartx.core.config.ui.type.UI
 import priv.seventeen.artist.arcartx.core.effect.data.EffectPosition
 import priv.seventeen.artist.arcartx.core.effect.data.WorldTextureBuilder
@@ -506,6 +507,24 @@ object NetworkMessageSender {
             MessageID.Server.CARD_MESSAGE,
             DecodeType.NORMAL,
             SPackCardMessage(cardID, cardData)
+        )
+    }
+
+    fun sendChatCardConfig(player: Player, chatCard: ChatCard) {
+        sendPacketSync(
+            player,
+            MessageID.Server.CHAT_CARD_CONFIG,
+            DecodeType.NORMAL,
+            SPackChatCardConfig.update(chatCard)
+        )
+    }
+
+    fun sendChatCardConfigRemove(player: Player, id: String) {
+        sendPacketSync(
+            player,
+            MessageID.Server.CHAT_CARD_CONFIG,
+            DecodeType.NORMAL,
+            SPackChatCardConfig.remove(id)
         )
     }
 

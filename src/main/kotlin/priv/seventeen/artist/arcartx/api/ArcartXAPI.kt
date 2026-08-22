@@ -10,6 +10,7 @@
 package priv.seventeen.artist.arcartx.api
 
 import priv.seventeen.artist.arcartx.core.area.ArcartXAreaManager
+import priv.seventeen.artist.arcartx.core.chatcard.ArcartXChatCardRegistry
 import priv.seventeen.artist.arcartx.core.effect.ArcartXEffectManager
 import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 import priv.seventeen.artist.arcartx.core.keybind.ArcartXKeyBindRegistry
@@ -27,6 +28,10 @@ object ArcartXAPI {
     /** 获取 UI 注册表，用于注册/管理自定义界面 */
     @JvmStatic
     fun getUIRegistry(): ArcartXUIRegistry = ArcartXUIRegistry
+
+    /** 获取聊天卡片注册表，用于注册、重载、发送和管理自定义聊天卡片 */
+    @JvmStatic
+    fun getChatCardRegistry(): ArcartXChatCardRegistry = ArcartXChatCardRegistry
 
     /** 获取按键绑定注册表 */
     @JvmStatic

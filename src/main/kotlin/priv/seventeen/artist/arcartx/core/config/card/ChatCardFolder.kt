@@ -10,6 +10,7 @@
 package priv.seventeen.artist.arcartx.core.config.card
 
 import org.bukkit.plugin.java.JavaPlugin
+import priv.seventeen.artist.arcartx.core.chatcard.ArcartXChatCardRegistry
 import priv.seventeen.artist.arcartx.commons.config.ArcartXConfigFolder
 import priv.seventeen.artist.arcartx.language.AXLanguageKey
 import priv.seventeen.artist.arcartx.language.L
@@ -32,7 +33,16 @@ class ChatCardFolder : ArcartXConfigFolder<ChatCard>(bukkitPlugin, "chat_card", 
 
 
     override fun reload() {
+        // 只移除本目录上一轮加载的卡片。
+        val builtInIds = configs.keys.toList()
+        builtInIds.forEach(ArcartXChatCardRegistry::unregisterWithoutSync)
+
         super.reload()
+
+        configs.forEach { (id, card) ->
+            ArcartXChatCardRegistry.registerWithoutSync(id, card)
+        }
+
         bukkitPlugin.sendMessage(L(AXLanguageKey.LOAD_CHAT_CARD, configs.size.toString()))
     }
 }
