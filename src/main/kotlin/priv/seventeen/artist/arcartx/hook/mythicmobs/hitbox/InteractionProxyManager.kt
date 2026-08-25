@@ -31,6 +31,10 @@ object InteractionProxyManager : Listener {
         val proxy = EntityBridge.createCustomEntity(owner, width, height)
 
         proxy.apply {
+            // Owner-backed custom entities only remember their owner at creation;
+            // the FollowOwner marker is what makes Asteroid synchronize position.
+            // Asteroid suspends this branch automatically while mountType != NONE.
+            EntityBridge.addFollowOwner(proxy, removeOnOwnerInvalid = true)
             EntityBridge.addHitbox(proxy, width, height)
 
             EntityBridge.addResize(proxy) { w, h ->

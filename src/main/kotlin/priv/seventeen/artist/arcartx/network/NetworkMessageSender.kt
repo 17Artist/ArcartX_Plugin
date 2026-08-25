@@ -570,7 +570,7 @@ object NetworkMessageSender {
         sendPacketSync(player, MessageID.Server.HIDE_HIT_BOX, DecodeType.NORMAL, SPackHideHitBox(entity, hide))
     }
 
-    fun sendModelEffect(player: Player, modelID: String, identifier: String, animation: String, speed: Double, scale: Float, keepTime: Int, glow: Boolean, effectPosition: EffectPosition) {
+    fun sendModelEffect(player: Player, identifier: String, modelID: String, animation: String, speed: Double, scale: Float, keepTime: Int, glow: Boolean, effectPosition: EffectPosition) {
         sendPacketSync(
             player,
             MessageID.Server.NAMED_MODEL_EFFECT,
