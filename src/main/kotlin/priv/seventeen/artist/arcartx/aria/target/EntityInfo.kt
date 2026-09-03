@@ -18,6 +18,124 @@ import priv.seventeen.artist.aria.callable.InvocationData
 /** 实体信息 */
 object EntityInfo {
 
+    @JvmStatic
+    @AriaInvokeHandler(value = "getName", target = LivingEntity::class)
+    fun getName(data: InvocationData): String {
+        val entity = data.target as LivingEntity
+        return entity.name
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getUniqueId", target = LivingEntity::class)
+    fun getUniqueId(data: InvocationData): String {
+        val entity = data.target as LivingEntity
+        return entity.uniqueId.toString()
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getEntityType", target = LivingEntity::class)
+    fun getEntityType(data: InvocationData): String {
+        val entity = data.target as LivingEntity
+        return entity.type.name
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getWorldName", target = LivingEntity::class)
+    fun getWorldName(data: InvocationData): String {
+        val entity = data.target as LivingEntity
+        return entity.world.name
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getVelocityX", target = LivingEntity::class)
+    fun getVelocityX(data: InvocationData): Double {
+        val entity = data.target as LivingEntity
+        return entity.velocity.x
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getVelocityY", target = LivingEntity::class)
+    fun getVelocityY(data: InvocationData): Double {
+        val entity = data.target as LivingEntity
+        return entity.velocity.y
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getVelocityZ", target = LivingEntity::class)
+    fun getVelocityZ(data: InvocationData): Double {
+        val entity = data.target as LivingEntity
+        return entity.velocity.z
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getFireTicks", target = LivingEntity::class)
+    fun getFireTicks(data: InvocationData): Int {
+        val entity = data.target as LivingEntity
+        return entity.fireTicks
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getFreezeTicks", target = LivingEntity::class)
+    fun getFreezeTicks(data: InvocationData): Int {
+        val entity = data.target as LivingEntity
+        return entity.freezeTicks
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getFallDistance", target = LivingEntity::class)
+    fun getFallDistance(data: InvocationData): Float {
+        val entity = data.target as LivingEntity
+        return entity.fallDistance
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "getTicksLived", target = LivingEntity::class)
+    fun getTicksLived(data: InvocationData): Int {
+        val entity = data.target as LivingEntity
+        return entity.ticksLived
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "isDead", target = LivingEntity::class)
+    fun isDead(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.isDead
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "isValid", target = LivingEntity::class)
+    fun isValid(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.isValid
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "isInvulnerable", target = LivingEntity::class)
+    fun isInvulnerable(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.isInvulnerable
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "isSilent", target = LivingEntity::class)
+    fun isSilent(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.isSilent
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "hasAI", target = LivingEntity::class)
+    fun hasAI(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.hasAI()
+    }
+
+    @JvmStatic
+    @AriaInvokeHandler(value = "hasGravity", target = LivingEntity::class)
+    fun hasGravity(data: InvocationData): Boolean {
+        val entity = data.target as LivingEntity
+        return entity.hasGravity()
+    }
 
     @JvmStatic
     @AriaInvokeHandler(value = "isInWater", target = LivingEntity::class)
