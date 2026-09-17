@@ -23,7 +23,6 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.player.*
 import org.bukkit.persistence.PersistentDataType
 import priv.seventeen.artist.arcartx.ArcartX
-import priv.seventeen.artist.arcartx.blockItemNamespace
 import priv.seventeen.artist.arcartx.blockNamespace
 import priv.seventeen.artist.arcartx.commons.link.ArcartXLinkManager
 import priv.seventeen.artist.arcartx.core.area.ArcartXAreaManager
@@ -36,7 +35,6 @@ import priv.seventeen.artist.arcartx.event.player.PlayerAreaEnterEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerAreaLeaveEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerExtraSlotUpdateEvent
 import priv.seventeen.artist.arcartx.network.NetworkMessageSender
-import priv.seventeen.artist.arcartx.nms.ItemBridge
 import priv.seventeen.artist.arcartx.script.ScriptManager
 import priv.seventeen.artist.arcartx.util.EntityUtils.doWithSeenBy
 import priv.seventeen.artist.arcartx.util.ItemStackUtils.getCooldown
@@ -130,13 +128,6 @@ fun onPlayerPlaceBlockEvent(event: BlockPlaceEvent) {
                 PersistentDataType.STRING,
                 event.itemInHand.getTag("model")
             )
-            val drop = event.itemInHand.clone()
-            drop.amount = 1
-            skull.persistentDataContainer.set(
-                blockItemNamespace,
-                PersistentDataType.STRING,
-                ItemBridge.item2json(drop)
-            )
             skull.update()
         }
     }
@@ -146,10 +137,8 @@ fun onPlayerPlaceBlockEvent(event: BlockPlaceEvent) {
 fun onPlayerBreakBlockEvent(event: BlockBreakEvent){
     if(event.block.state is Skull){
         val skull = event.block.state as Skull
-        if(skull.persistentDataContainer.has(blockItemNamespace, PersistentDataType.STRING)){
-            val item = ItemBridge.json2Item(skull.persistentDataContainer.get(blockItemNamespace, PersistentDataType.STRING) ?: return)
+        if(skull.persistentDataContainer.has(blockNamespace, PersistentDataType.STRING)){
             event.isDropItems = false
-            event.block.world.dropItem(event.block.location, item)
         }
     }
 }

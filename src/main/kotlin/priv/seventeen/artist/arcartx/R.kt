@@ -19,5 +19,3 @@ import java.time.Instant
 import java.util.*
 
 val blockNamespace = NamespacedKey(bukkitPlugin, "arcartx_model")
-
-val blockItemNamespace = NamespacedKey(bukkitPlugin, "arcartx_model_from")
