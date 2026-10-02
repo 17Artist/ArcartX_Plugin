@@ -25,6 +25,11 @@ object ByteArrayUtils {
     private val deflaterPool = ThreadLocal.withInitial { Deflater(Deflater.BEST_SPEED, true) }
     private val inflaterPool = ThreadLocal.withInitial { Inflater(true) }
 
+    internal fun releaseCompressionResources() {
+        deflaterPool.get().end()
+        deflaterPool.remove()
+    }
+
     fun compressIfNeeded(data: ByteArray): ByteArray {
         if (data.size < COMPRESSION_THRESHOLD) {
             return data

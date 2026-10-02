@@ -9,7 +9,6 @@
 
 package priv.seventeen.artist.arcartx.network
 
-import io.netty.buffer.Unpooled
 import org.bukkit.World
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -21,18 +20,15 @@ import priv.seventeen.artist.arcartx.core.effect.data.EffectPosition
 import priv.seventeen.artist.arcartx.core.effect.data.WorldTextureBuilder
 import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 import priv.seventeen.artist.arcartx.event.client.ClientInitializedEvent
-import priv.seventeen.artist.arcartx.network.encryptor.Base64Encryptor
 import priv.seventeen.artist.arcartx.network.message.DecodeType
 import priv.seventeen.artist.arcartx.network.message.MessageID
 import priv.seventeen.artist.arcartx.network.packet.server.*
-import priv.seventeen.artist.arcartx.util.ByteArrayUtils
 import priv.seventeen.artist.arcartx.util.JsonUtils.toJson
 import priv.seventeen.artist.arcartx.nms.AsteroidScheduler.ensureAsyncThread
 import priv.seventeen.artist.arcartx.nms.AsteroidScheduler.ensureMainThread
+import priv.seventeen.artist.arcartx.nms.AsteroidScheduler
 import priv.seventeen.artist.blink.bukkitPlugin
-import java.nio.charset.StandardCharsets
 import java.util.*
-import java.util.function.Consumer
 
 /** 网络消息发送器，封装所有服务端到客户端的数据包发送逻辑 */
 object NetworkMessageSender {
@@ -603,78 +599,31 @@ object NetworkMessageSender {
     }
 
     fun sendPacketSync(player: Player, messageID: MessageID, decodeType: DecodeType, packet: ServerPacket) {
-        bukkitPlugin.ensureMainThread { buildAndSend(player, messageID, decodeType, packet) }
+        val connection = OutgoingPacketDispatcher.connection(player) ?: return
+        val prepare = Runnable { preparePacket(connection, messageID, decodeType, packet) }
+        if (AsteroidScheduler.isFolia()) {
+            AsteroidScheduler.runEntityTask(bukkitPlugin, player, prepare)
+        } else {
+            bukkitPlugin.ensureMainThread(prepare)
+        }
     }
 
     fun sendPacketAsync(player: Player, messageID: MessageID, decodeType: DecodeType, packet: ServerPacket) {
-        bukkitPlugin.ensureAsyncThread { buildAndSend(player, messageID, decodeType, packet) }
+        val connection = OutgoingPacketDispatcher.connection(player) ?: return
+        bukkitPlugin.ensureAsyncThread { preparePacket(connection, messageID, decodeType, packet) }
     }
 
-    /** 编码 + base64/AES + 分块 + 写通道；sync/async 共用，仅线程调度不同 */
-    private fun buildAndSend(player: Player, messageID: MessageID, decodeType: DecodeType, packet: ServerPacket) {
-        val messages: List<BaseMessage> = createMessage { message: BaseMessage ->
-            message.type = decodeType.id
-            message.code = messageID.id
-            message.id = getNextID()
-            // base64 编码
-            if (decodeType === DecodeType.AES) {
-                ArcartXEntityManager.getPlayer(player)?.encryptor?.encode(packet.toJson())?.let {
-                    message.message = it
-                }
-            } else {
-                message.message = Base64Encryptor.base64Encrypt(packet.toJson())
-            }
-        }
-        messages.forEach(Consumer { message: BaseMessage ->
-            val bytes: ByteArray = message.toJson().toByteArray(StandardCharsets.UTF_8)
-            val processed = ByteArrayUtils.compressIfNeeded(bytes)
-            val buf = Unpooled.buffer(processed.size + 1)
-            buf.writeByte(NetworkManager.COMPRESSED_FLAG)
-            buf.writeBytes(processed)
-            player.sendPluginMessage(bukkitPlugin, NetworkManager.CHANNEL, buf.array())
-            buf.release()
-        })
-    }
 
-    private fun createMessage(packet: IPacketWriter): ArrayList<BaseMessage> {
-        val result = ArrayList<BaseMessage>()
-
-        val message = BaseMessage()
-        packet.write(message)
-
-        if (message.message.length > 30000) {
-            val size: Int = (message.message.length / 30000) + (if (message.message.length % 30000 > 0) 1 else 0)
-
-            for (part in 0 until size) {
-                val mul = getBaseMessage(message, part, size)
-                result.add(mul)
-            }
-        } else {
-            result.add(message)
-        }
-
-        return result
-    }
-
-    private fun getBaseMessage(message: BaseMessage, part: Int, size: Int): BaseMessage {
-        val mul = BaseMessage()
-        mul.type = message.type
-        mul.id = message.id
-        mul.code = message.code
-        val cutString: String = if (part + 1 == size) {
-            message.message.substring(30000 * part)
-        } else {
-            message.message.substring(30000 * part, 30000 * (part + 1))
-        }
-        mul.message = cutString
-
-        mul.part = part
-        mul.size = size
-        return mul
-    }
-
-    private fun interface IPacketWriter {
-        fun write(message: BaseMessage)
+    private fun preparePacket(
+        connection: OutgoingPacketDispatcher.Connection,
+        messageID: MessageID,
+        decodeType: DecodeType,
+        packet: ServerPacket
+    ) {
+        val key = if (decodeType == DecodeType.AES) {
+            ArcartXEntityManager.players[connection.player.uniqueId]?.encryptor?.aesKey ?: return
+        } else null
+        connection.submit(OutgoingPacket(getNextID(), messageID.id, decodeType, packet.toJson(), key))
     }
 
 

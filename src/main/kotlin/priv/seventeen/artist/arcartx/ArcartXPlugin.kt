@@ -20,6 +20,7 @@ import priv.seventeen.artist.arcartx.language.language
 import priv.seventeen.artist.arcartx.commons.message.ArcartXSender.Companion.printStart
 import priv.seventeen.artist.arcartx.commons.message.ArcartXSender.Companion.sendMessage
 import priv.seventeen.artist.arcartx.network.NetworkManager
+import priv.seventeen.artist.arcartx.network.OutgoingPacketDispatcher
 import priv.seventeen.artist.arcartx.nms.AsteroidScheduler
 import priv.seventeen.artist.asteroid.AsteroidAPI
 import priv.seventeen.artist.blink.bukkitPlugin
@@ -46,12 +47,14 @@ object ArcartX {
         registerCommands()
         databaseManager = DatabaseManager(configs.setting.database)
         networkManager = NetworkManager()
+        OutgoingPacketDispatcher.start()
         bukkitPlugin.sendMessage(L(AXLanguageKey.SERVER_VERSION, AsteroidAPI.getMcVersion() ?: "unknown"))
 
     }
 
     @Awake(LifeCycle.DISABLE)
     fun onDisable() {
+        OutgoingPacketDispatcher.stop()
         AsteroidScheduler.cancelAll()
         databaseManager?.close()
         networkManager?.close()

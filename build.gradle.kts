@@ -91,6 +91,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok:1.18.24")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("com.google.code.gson:gson:2.10.1")
     testImplementation("priv.seventeen.artist.symphony:symphony:1.0.0")
 }
 

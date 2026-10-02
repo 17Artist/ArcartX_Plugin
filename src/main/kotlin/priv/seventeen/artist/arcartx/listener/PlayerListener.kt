@@ -35,6 +35,7 @@ import priv.seventeen.artist.arcartx.event.player.PlayerAreaEnterEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerAreaLeaveEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerExtraSlotUpdateEvent
 import priv.seventeen.artist.arcartx.network.NetworkMessageSender
+import priv.seventeen.artist.arcartx.network.OutgoingPacketDispatcher
 import priv.seventeen.artist.arcartx.script.ScriptManager
 import priv.seventeen.artist.arcartx.util.EntityUtils.doWithSeenBy
 import priv.seventeen.artist.arcartx.util.ItemStackUtils.getCooldown
@@ -52,6 +53,11 @@ import priv.seventeen.artist.blink.bukkitPlugin
 import priv.seventeen.artist.blink.event.AutoListener
 import priv.seventeen.artist.blink.lifecycle.Awake
 import priv.seventeen.artist.blink.lifecycle.LifeCycle
+
+@AutoListener(priority = EventPriority.LOWEST)
+fun onPlayerNetworkJoin(event: PlayerJoinEvent) {
+    OutgoingPacketDispatcher.connect(event.player)
+}
 
 @AutoListener(priority = EventPriority.HIGHEST)
 fun onPlayerJoinEvent(event: PlayerJoinEvent) {
@@ -90,6 +96,7 @@ fun onPlayerChangeWorld(event: PlayerChangedWorldEvent){
 
 @AutoListener(priority = EventPriority.LOWEST)
 fun onPlayerLeaveServer(event: PlayerQuitEvent){
+    OutgoingPacketDispatcher.disconnect(event.player)
     ArcartXEntityManager.removePlayer(event.player)
     ArcartXEditorManager.removeEditorData(event.player.uniqueId)
 }
