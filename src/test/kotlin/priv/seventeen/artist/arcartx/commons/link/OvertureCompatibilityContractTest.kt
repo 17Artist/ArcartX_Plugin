@@ -36,6 +36,7 @@ class OvertureCompatibilityContractTest {
     fun `arcartx owns every overture client tag extension`() {
         val tags = setOf(
             "icon",
+            "type",
             "drop",
             "model",
             "armor_texture",
@@ -70,6 +71,14 @@ class OvertureCompatibilityContractTest {
         assertThrows(IllegalArgumentException::class.java) {
             OvertureLinker.normalizeScalar("costume_hide", "invalid")
         }
+    }
+
+    @Test
+    fun `tooltip type is normalized as a string`() {
+        assertNull(OvertureLinker.normalizeScalar("type", null))
+        assertNull(OvertureLinker.normalizeScalar("type", "  "))
+        assertEquals("weapon", OvertureLinker.normalizeScalar("type", " weapon "))
+        assertEquals("42", OvertureLinker.normalizeScalar("type", 42))
     }
 
     @Test

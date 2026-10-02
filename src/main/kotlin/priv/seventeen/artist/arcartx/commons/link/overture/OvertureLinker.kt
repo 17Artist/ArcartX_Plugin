@@ -27,6 +27,7 @@ object OvertureLinker {
 
     private val scalarTags = listOf(
         "icon",
+        "type",
         "drop",
         "model",
         "armor_texture",
