@@ -10,6 +10,8 @@
 package priv.seventeen.artist.arcartx.core.playerhost
 
 import com.google.gson.GsonBuilder
+import java.math.BigDecimal
+import java.math.BigInteger
 import java.util.Collections
 
 /** Validates sparse server overrides while preserving explicit runtime-map deletions. */
@@ -36,11 +38,14 @@ object HostProfileValidation {
 
     @JvmStatic fun validate(id: String, patch: Map<String, Any?>): Map<String, Any?> {
         requireId(id)
-        require(patch.keys.all { it in fields }) { "宿主配置包含未知字段" }
-        require(patch["model"] is String) { "宿主配置需要 model" }
-        requireName(patch["model"] as String)
-        require(gson.toJson(patch).length <= 524288) { "宿主配置过大" }
-        val active = withoutDeletes(patch)
+        // Copy first: a caller-owned mutable Number must not change after validation/publication.
+        @Suppress("UNCHECKED_CAST")
+        val snapshot = freeze(patch) as Map<String, Any?>
+        require(snapshot.keys.all { it in fields }) { "宿主配置包含未知字段" }
+        require(snapshot["model"] is String) { "宿主配置需要 model" }
+        requireName(snapshot["model"] as String)
+        require(gson.toJson(snapshot).length <= 524288) { "宿主配置过大" }
+        val active = withoutDeletes(snapshot)
         active["schema"]?.let { require(it is Number && it.toDouble() == 1.0) { "宿主配置 schema 必须是 1" } }
         fun strings(value: Any?): List<String> {
             require(value is List<*> && value.size <= 4096 && value.all { it is String }) { "骨骼或分部列表无效" }
@@ -85,8 +90,7 @@ object HostProfileValidation {
                     if (hide.containsKey("bones")) strings(hide["bones"]) else emptyList())
             }
         }
-        @Suppress("UNCHECKED_CAST")
-        return freeze(patch) as Map<String, Any?>
+        return snapshot
     }
 
     private fun withoutDeletes(value: Map<String, Any?>): Map<String, Any?> = value.filterValues { it != null }.mapValues { (_, item) ->
@@ -100,6 +104,9 @@ object HostProfileValidation {
     private fun freeze(value: Any?): Any? = when (value) {
         is Map<*, *> -> Collections.unmodifiableMap(value.entries.associateTo(LinkedHashMap()) { it.key to freeze(it.value) })
         is List<*> -> Collections.unmodifiableList(value.map(::freeze))
+        is Byte, is Short, is Int, is Long, is Float, is Double -> value
+        is Number -> if (value.javaClass == BigInteger::class.java || value.javaClass == BigDecimal::class.java)
+            value else value.toDouble()
         else -> value
     }
 }

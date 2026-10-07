@@ -77,6 +77,7 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     private var appearanceRevision = 0L
     private var appearancePreview: PlayerAppearance? = null
     private var appearanceCommitInProgress = false
+    private var appearanceEditInProgress = false
     private var explicitHostSelection = false
 
     @Volatile
@@ -210,8 +211,14 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     fun setAppearance(appearance: PlayerAppearance): Boolean = commitAppearance(appearance, hostSelected = appearance.isCustomHost())
 
     fun updateAppearance(update: Consumer<PlayerAppearanceBuilder>): Boolean {
+        requireAppearanceWriteAllowed()
         val builder = PlayerAppearanceBuilder(appearanceState)
-        update.accept(builder)
+        appearanceEditInProgress = true
+        try {
+            update.accept(builder)
+        } finally {
+            appearanceEditInProgress = false
+        }
         val next = builder.build()
         return commitAppearance(next, hostSelected = if (builder.hostSelectionChanged) next.isCustomHost() else null)
     }
@@ -226,18 +233,26 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
         return next
     }
 
+    private fun requireAppearanceWriteAllowed() {
+        check(!appearanceEditInProgress) { "请在 updateAppearance 回调中仅修改 builder，不要再次提交外观" }
+        check(!appearanceCommitInProgress) { "不能在外观变更事件中再次提交外观" }
+    }
+
     private fun changeAfterLegacyEvent(change: (PlayerAppearance) -> PlayerAppearance, event: () -> Boolean,
-        resetBody: Boolean? = null, hostSelected: Boolean? = null): Boolean = commitLegacyAppearanceChange(
-        { appearanceState }, change, ::validateAppearance, event,
-        { commitAppearance(it, resetBody, hostSelected) }
-    )
+        resetBody: Boolean? = null, hostSelected: Boolean? = null): Boolean {
+        requireAppearanceWriteAllowed()
+        return commitLegacyAppearanceChange(
+            { appearanceState }, change, ::validateAppearance, event,
+            { commitAppearance(it, resetBody, hostSelected) }
+        )
+    }
 
     private fun commitAppearance(candidate: PlayerAppearance, resetBody: Boolean? = null, hostSelected: Boolean? = null): Boolean {
+        requireAppearanceWriteAllowed()
         val next = validateAppearance(candidate)
         val previous = appearanceState
         val nextHostSelection = hostSelected ?: explicitHostSelection
-        if (next == previous && nextHostSelection == explicitHostSelection && resetBody != true) return true
-        check(!appearanceCommitInProgress) { "不能在外观变更事件中再次提交外观" }
+        if (next == previous && nextHostSelection == explicitHostSelection && resetBody != true && appearancePreview == null) return true
         appearanceCommitInProgress = true
         try {
             if (!PlayerAppearanceChangeEvent(player, previous, next).call()) return false
@@ -370,11 +385,11 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
 
 
     fun tryModel(modelID: String, scale: Double, time: Long){
+        requireAppearanceWriteAllowed()
         require(time >= 0) { "试穿时间不能为负数" }
         // A body-only projection avoids attaching the current host's bones/slots to a different rig.
         val preview = PlayerAppearance(model = modelID, scale = scale, variant = "CUSTOM_BBMODEL").validated()
         val previous = appearancePreview ?: appearanceState
-        check(!appearanceCommitInProgress) { "不能在外观变更事件中再次提交外观" }
         appearanceCommitInProgress = true
         try {
             if (!PlayerAppearanceChangeEvent(player, previous, preview).call()) return

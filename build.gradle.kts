@@ -93,6 +93,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("com.google.code.gson:gson:2.10.1")
     testImplementation("priv.seventeen.artist.symphony:symphony:1.0.0")
+    testImplementation("org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT")
 }
 
 tasks.withType<Test> {

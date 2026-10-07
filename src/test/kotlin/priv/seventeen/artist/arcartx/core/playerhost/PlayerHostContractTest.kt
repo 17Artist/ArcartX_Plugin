@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test
 import priv.seventeen.artist.arcartx.network.message.MessageID
 import priv.seventeen.artist.arcartx.network.packet.server.SPackPlayerAppearance
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 class PlayerHostContractTest {
     @Test fun `legacy reset projection preserves explicit intent across model and scale changes`() {
@@ -123,6 +124,44 @@ class PlayerHostContractTest {
         assertEquals("hero", frozen["model"])
         assertEquals(listOf("Head"), (frozen["parts"] as Map<*, *>)["HEAD"])
         assertThrows(UnsupportedOperationException::class.java) { (frozen as MutableMap)["model"] = "changed" }
+    }
+
+    @Test fun `profile publication snapshots mutable numeric values before validation`() {
+        val schema = AtomicInteger(1)
+        val order = AtomicInteger(2)
+        val frozen = HostProfileValidation.validate("hero", mapOf("model" to "hero", "schema" to schema,
+            "slots" to mapOf("hair" to mapOf("order" to order))))
+        val before = Gson().toJson(frozen)
+        schema.set(2)
+        order.set(99)
+        assertEquals(1.0, (frozen["schema"] as Number).toDouble())
+        assertEquals(2.0, (((frozen["slots"] as Map<*, *>)["hair"] as Map<*, *>)["order"] as Number).toDouble())
+        assertEquals(before, Gson().toJson(frozen))
+        assertFalse(frozen["schema"] is AtomicInteger)
+    }
+
+    @Test fun `numeric snapshots do not truncate invalid slot orders before validation`() {
+        class MutableNumber(var value: Double) : Number() {
+            override fun toByte() = value.toInt().toByte()
+            override fun toShort() = value.toInt().toShort()
+            override fun toInt() = value.toInt()
+            override fun toLong() = value.toLong()
+            override fun toFloat() = value.toFloat()
+            override fun toDouble() = value
+            @Suppress("OVERRIDE_DEPRECATION")
+            override fun toChar() = value.toInt().toChar()
+        }
+        for (invalid in listOf(1.5, Double.NaN, Double.POSITIVE_INFINITY, Int.MAX_VALUE.toDouble() + 1)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                HostProfileValidation.validate("hero", mapOf("model" to "hero", "slots" to
+                    mapOf("hair" to mapOf("order" to MutableNumber(invalid)))))
+            }
+        }
+        val value = MutableNumber(-7.0)
+        val frozen = HostProfileValidation.validate("hero", mapOf("model" to "hero", "slots" to
+            mapOf("hair" to mapOf("order" to value))))
+        value.value = 8.5
+        assertEquals(-7.0, (((frozen["slots"] as Map<*, *>)["hair"] as Map<*, *>)["order"] as Number).toDouble())
     }
 
     @Test fun `profile typo and invalid semantic bone are rejected`() {
