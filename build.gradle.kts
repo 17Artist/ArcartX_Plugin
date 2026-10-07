@@ -99,6 +99,23 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("benchmark")
+    }
+}
+
+tasks.register<Test>("benchmark") {
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("benchmark")
+    }
+    testLogging.showStandardStreams = true
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }

@@ -33,6 +33,7 @@ import priv.seventeen.artist.arcartx.core.config.slot.SlotFolder
 import priv.seventeen.artist.arcartx.core.config.ui.folder.TipFolder
 import priv.seventeen.artist.arcartx.core.config.ui.folder.UIFolder
 import priv.seventeen.artist.arcartx.core.config.waypoint.WaypointFolder
+import priv.seventeen.artist.arcartx.core.playerhost.PlayerHostProfiles
 import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 import priv.seventeen.artist.arcartx.event.plugin.ArcartXReloadEvent
 import priv.seventeen.artist.arcartx.language.language
@@ -40,6 +41,7 @@ import priv.seventeen.artist.arcartx.language.AXLanguageKey
 import priv.seventeen.artist.arcartx.language.L
 import priv.seventeen.artist.arcartx.commons.message.ArcartXSender.Companion.sendException
 import priv.seventeen.artist.arcartx.network.NetworkMessageSender
+import priv.seventeen.artist.arcartx.nms.AsteroidScheduler
 import priv.seventeen.artist.arcartx.nms.AsteroidScheduler.ensureAsyncThread
 import priv.seventeen.artist.blink.bukkitPlugin
 import java.io.File
@@ -66,6 +68,8 @@ class ArcartXConfigs {
     val entityModelFolder: EntityModelFolder = EntityModelFolder()
 
     val modelLinkFolder: ModelLinkFolder = ModelLinkFolder()
+
+    val playerHostProfiles: PlayerHostProfiles = PlayerHostProfiles()
 
     val fontIconFolder: FontIconFolder = FontIconFolder()
 
@@ -110,6 +114,7 @@ class ArcartXConfigs {
         economySetting.reload()
         entityModelFolder.reload()
         modelLinkFolder.reload()
+        playerHostProfiles.reload()
 
         cameraSetting.reload()
         cameraPresetFolder.reload()
@@ -151,6 +156,9 @@ class ArcartXConfigs {
                         NetworkMessageSender.sendResourceReload(it.player, false)
                     }
                     NetworkMessageSender.sendSettingReload(it.player)
+                    AsteroidScheduler.ensureMainThread(bukkitPlugin) {
+                        it.syncAppearanceProfiles()
+                    }
                 }
             }
         }

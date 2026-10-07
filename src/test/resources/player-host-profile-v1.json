@@ -1,0 +1,1 @@
+{"schema":1,"model":"characters/hero","parts":{"HEAD":["Head"],"BODY":["Body"]},"semantic_bones":{"head":"Head","body":"Body"},"locators":{"right_hand":{"bone":"RightArm","locator":"item"}},"slots":{"hair":{"label":"头发","default_hide":{"parts":["HEAD"],"bones":[]}}}}

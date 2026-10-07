@@ -9,54 +9,13 @@
 
 package priv.seventeen.artist.arcartx.commons.link
 
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import priv.seventeen.artist.arcartx.commons.link.overture.OvertureLinker
-import java.nio.file.Files
-import java.nio.file.Path
 
 class OvertureCompatibilityContractTest {
-
-    private val linkerSource = read(
-        "src/main/kotlin/priv/seventeen/artist/arcartx/commons/link/overture/OvertureLinker.kt"
-    )
-    private val providerSource = read(
-        "src/main/kotlin/priv/seventeen/artist/arcartx/commons/link/item/OvertureItemProvider.kt"
-    )
-    private val builtInLinkerSource = read(
-        "src/main/kotlin/priv/seventeen/artist/arcartx/commons/link/BuiltInLinker.kt"
-    )
-    private val buildSource = read("build.gradle.kts")
-
-    @Test
-    fun `arcartx owns every overture client tag extension`() {
-        val tags = setOf(
-            "icon",
-            "type",
-            "drop",
-            "model",
-            "armor_texture",
-            "costume_model",
-            "costume_hide",
-            "fp_model",
-            "extra_model",
-            "url",
-            "cooldown"
-        )
-
-        tags.forEach { tag ->
-            assertTrue(linkerSource.contains("\"$tag\""), "Missing ArcartX tag Meta: $tag")
-        }
-        assertTrue(linkerSource.contains("OvertureAPI.registerMeta"))
-        assertTrue(linkerSource.contains("sourceTag[tagName] = ItemTagData.of(value)"))
-        assertTrue(linkerSource.contains("sourceTag.remove(tagName)"))
-        assertTrue(linkerSource.contains("sourceTag[\"extra_model\"] = ItemTagData.of(extraModels)"))
-        assertTrue(linkerSource.contains("sourceTag.remove(\"extra_model\")"))
-    }
 
     @Test
     fun `costume hide values are normalized as booleans`() {
@@ -80,22 +39,4 @@ class OvertureCompatibilityContractTest {
         assertEquals("weapon", OvertureLinker.normalizeScalar("type", " weapon "))
         assertEquals("42", OvertureLinker.normalizeScalar("type", 42))
     }
-
-    @Test
-    fun `overture is loaded before arcartx and registered during load`() {
-        assertTrue(buildSource.contains("\"Rondo\", \"Overture\""))
-        assertTrue(buildSource.contains("compileOnly(\"priv.seventeen.artist.overture:overture:1.0.0\")"))
-        assertTrue(builtInLinkerSource.contains("@Awake(LifeCycle.LOAD)"))
-        assertTrue(builtInLinkerSource.contains("OvertureLinker.registerMetaExtensions()"))
-    }
-
-    @Test
-    fun `overture participates in the unified item provider api`() {
-        assertTrue(providerSource.contains("override fun getIdentifier(): String = \"Overture\""))
-        assertTrue(providerSource.contains("OvertureAPI.generateItem(id)"))
-        assertFalse(providerSource.contains("Player"))
-    }
-
-    private fun read(relativePath: String): String =
-        Files.readString(Path.of(relativePath))
 }

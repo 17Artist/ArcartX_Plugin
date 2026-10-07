@@ -100,6 +100,7 @@ interface MessageID {
         PLAYER_VARIANT(66),
         ANIMATION_PACK(67),
         CHAT_CARD_CONFIG(68), // 单张聊天卡片模板注册/重载/注销
+        PLAYER_APPEARANCE(69),
         ;
 
         override val id: Int = id

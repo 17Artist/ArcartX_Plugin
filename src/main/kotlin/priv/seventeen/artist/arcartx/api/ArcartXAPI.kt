@@ -10,6 +10,8 @@
 package priv.seventeen.artist.arcartx.api
 
 import priv.seventeen.artist.arcartx.core.area.ArcartXAreaManager
+import priv.seventeen.artist.arcartx.ArcartX
+import priv.seventeen.artist.arcartx.core.playerhost.PlayerHostProfiles
 import priv.seventeen.artist.arcartx.core.chatcard.ArcartXChatCardRegistry
 import priv.seventeen.artist.arcartx.core.effect.ArcartXEffectManager
 import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
@@ -24,6 +26,10 @@ import priv.seventeen.artist.arcartx.hook.mythicmobs.hitbox.InteractionProxyMana
  * 所有方法均为线程安全的单例访问。
  */
 object ArcartXAPI {
+
+    /** 获取玩家宿主配置注册表。批量修改后调用 syncPlayers 同步在线客户端。 */
+    @JvmStatic
+    fun getPlayerHostRegistry(): PlayerHostProfiles = ArcartX.configs.playerHostProfiles
 
     /** 获取 UI 注册表，用于注册/管理自定义界面 */
     @JvmStatic

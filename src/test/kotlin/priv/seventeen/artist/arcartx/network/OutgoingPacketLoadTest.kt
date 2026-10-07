@@ -10,6 +10,7 @@
 package priv.seventeen.artist.arcartx.network
 
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import priv.seventeen.artist.arcartx.network.message.DecodeType
 import priv.seventeen.artist.arcartx.util.ByteArrayUtils
@@ -23,6 +24,62 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class OutgoingPacketLoadTest {
+    @Test
+    fun `100 simultaneous initialization cursors remain ordered with real encoding workers`() {
+        val owner = Thread.currentThread()
+        val workers = Executors.newFixedThreadPool(2)
+        val deliveries = LinkedBlockingQueue<Runnable>()
+        val errors = ConcurrentLinkedQueue<Exception>()
+        val received = IntArray(100)
+        val ended = IntArray(100)
+        val queues = mutableListOf<OutgoingPacketQueue>()
+        val packetsPerConnection = 5503
+        var delivered = 0
+        try {
+            repeat(100) { connection ->
+                val queue = OutgoingPacketQueue(workers, { deliveries.add(it) }, {
+                    check(Thread.currentThread() === owner)
+                    check(received[connection] == ByteBuffer.wrap(it).int)
+                    received[connection]++
+                    delivered++
+                }, errors::add, {
+                    check(Thread.currentThread() !== owner)
+                    listOf(ByteBuffer.allocate(4).putInt(it.id).array())
+                })
+                queues += queue
+                var id = 0
+                fun emit() {
+                    check(Thread.currentThread() === owner)
+                    check(queue.submit(OutgoingPacket(id++, 1, DecodeType.NORMAL, "{}")))
+                }
+                emit()
+                queue.submitInitialization(sequence<() -> Unit> {
+                    yield { emit() }
+                    repeat(300) { yield { repeat(8) { emit() } } }
+                    repeat(50) { yield { repeat(2) { emit() } } }
+                }.iterator()) {
+                    check(received[connection] == id)
+                    ended[connection]++
+                    repeat(3000) { emit() }
+                }
+                queue.submit(OutgoingPacket(packetsPerConnection - 1, 1, DecodeType.NORMAL, "{}"))
+            }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+            while (delivered < 100 * packetsPerConnection && errors.isEmpty() && System.nanoTime() < deadline) {
+                deliveries.poll(100, TimeUnit.MILLISECONDS)?.run()
+            }
+            assertTrue(errors.isEmpty(), errors.toString())
+            assertEquals(100 * packetsPerConnection, delivered)
+            assertTrue(received.all { it == packetsPerConnection })
+            assertTrue(ended.all { it == 1 })
+            println("INITIALIZATION_LOAD simulatedConnections=100 packets=$delivered endEvents=${ended.sum()} errors=${errors.size}")
+        } finally {
+            queues.forEach(OutgoingPacketQueue::close)
+            workers.shutdownNow()
+            assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS))
+        }
+    }
+
     @Test
     fun `concurrent producers cannot lose packets or reorder an individual producer`() {
         val workers = Executors.newFixedThreadPool(2)
@@ -59,6 +116,52 @@ class OutgoingPacketLoadTest {
     }
 
     @Test
+    fun `real encoder delivers unicode fragments in order on the owner thread`() {
+        val owner = Thread.currentThread()
+        val workers = Executors.newSingleThreadExecutor { task ->
+            Thread({
+                try { task.run() } finally { ByteArrayUtils.releaseCompressionResources() }
+            }, "packet-encoding-test-worker")
+        }
+        val deliveries = LinkedBlockingQueue<Runnable>()
+        val errors = ConcurrentLinkedQueue<Exception>()
+        val received = mutableListOf<ByteArray>()
+        val queue = OutgoingPacketQueue(workers, { deliveries.add(it) }, {
+            check(Thread.currentThread() === owner)
+            received += it
+        }, errors::add, {
+            check(Thread.currentThread() !== owner)
+            OutgoingPacketEncoder.encode(it)
+        })
+        try {
+            val packets = listOf(
+                OutgoingPacket(1, 25, DecodeType.NORMAL, "{\"text\":\"开始\"}"),
+                OutgoingPacket(2, 25, DecodeType.NORMAL, "{\"text\":\"" + "装备动画 🎮 ".repeat(4000) + "\"}"),
+                OutgoingPacket(3, 25, DecodeType.NORMAL, "{\"text\":\"结束\"}")
+            )
+            val expected = packets.flatMap(OutgoingPacketEncoder::encode)
+            assertTrue(expected.size > packets.size)
+            packets.forEach { assertTrue(queue.submit(it)) }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (received.size < expected.size && errors.isEmpty() && System.nanoTime() < deadline) {
+                deliveries.poll(100, TimeUnit.MILLISECONDS)?.run()
+            }
+            assertTrue(errors.isEmpty(), errors.toString())
+            assertEquals(expected.size, received.size)
+            expected.forEachIndexed { index, frame -> assertArrayEquals(frame, received[index]) }
+        } finally {
+            queue.close()
+            workers.shutdownNow()
+            try {
+                assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS))
+            } finally {
+                ByteArrayUtils.releaseCompressionResources()
+            }
+        }
+    }
+
+    @Test
+    @Tag("benchmark")
     fun `100 simulated connections move encoding cpu off the delivery thread`() {
         val ownerThread = Thread.currentThread()
         val cpu = ManagementFactory.getThreadMXBean()
@@ -119,8 +222,11 @@ class OutgoingPacketLoadTest {
         } finally {
             queues.forEach(OutgoingPacketQueue::close)
             workers.shutdownNow()
-            workers.awaitTermination(5, TimeUnit.SECONDS)
-            ByteArrayUtils.releaseCompressionResources()
+            try {
+                workers.awaitTermination(5, TimeUnit.SECONDS)
+            } finally {
+                ByteArrayUtils.releaseCompressionResources()
+            }
         }
     }
 }

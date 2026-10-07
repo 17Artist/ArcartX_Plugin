@@ -13,10 +13,13 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import priv.seventeen.artist.arcartx.ArcartX
+import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 import priv.seventeen.artist.arcartx.commons.link.attribute.AttributeProvider
 import priv.seventeen.artist.arcartx.core.config.area.Area
 import priv.seventeen.artist.arcartx.core.effect.data.EffectPosition
 import priv.seventeen.artist.arcartx.core.effect.data.WorldTextureBuilder
+import priv.seventeen.artist.arcartx.core.playerhost.*
+import priv.seventeen.artist.arcartx.event.player.PlayerAppearanceChangeEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerAnimationPackChangeEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerCostumeChangeEvent
 import priv.seventeen.artist.arcartx.event.player.PlayerExtraSlotUpdateEvent
@@ -31,6 +34,7 @@ import priv.seventeen.artist.arcartx.util.EntityUtils.doWithSeenBy
 import priv.seventeen.artist.arcartx.util.collections.CallBack
 import priv.seventeen.artist.blink.bukkitPlugin
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Consumer
 import kotlin.math.max
 
 class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
@@ -68,10 +72,28 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     // 额外模型
     private var extraModels = HashMap<String, String>()
 
-    // 时装
-    private var costumeSuit: String? = null
-    private var costumeSuitHide: Boolean = false
-    private val costumeSlots = HashMap<CostumeSlot, Pair<String, Boolean>>()
+    // A single immutable authority for body, profile, costumes and animation pack.
+    private var appearanceState = PlayerAppearance()
+    private var appearanceRevision = 0L
+    private var appearancePreview: PlayerAppearance? = null
+    private var appearanceCommitInProgress = false
+    private var explicitHostSelection = false
+
+    @Volatile
+    private var clientCapabilities: Set<String> = emptySet()
+
+    fun supportsCustomPlayerHost(): Boolean = CUSTOM_PLAYER_HOST_CAPABILITY in clientCapabilities
+
+    fun setClientCapabilities(capabilities: Collection<String>) {
+        require(capabilities.size <= 64 && capabilities.all { it.length <= 64 && it.matches(Regex("[a-z][a-z0-9_.-]{0,63}")) }) {
+            "客户端能力列表无效"
+        }
+        clientCapabilities = capabilities.toSet()
+    }
+
+    fun getAppearance(): PlayerAppearance = appearanceState
+
+    fun getAppearanceRevision(): Long = appearanceRevision
 
     // 玩家模型变体：决定是否叠加原版附属物(盔甲/披风/鞘翅/时装)
     private var variant: PlayerModelVariant = PlayerModelVariant.DEFAULT_BBMODEL
@@ -105,17 +127,20 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     }
 
     override fun setModel(modelID: String, scale: Double) {
-        super.setModel(modelID, scale)
-        playerModel = modelID
-        playerModelScale = scale
-        PlayerModelUpdateEvent(player, modelID).call()
+        if (commitAppearance(appearanceState.copy(model = modelID, scale = scale, profileId = ""), true, false)) {
+            PlayerModelUpdateEvent(player, modelID).call()
+        }
+    }
+
+    override fun setModel(modelID: String, scale: Double, reset: Boolean) {
+        if (commitAppearance(appearanceState.copy(model = modelID, scale = scale, profileId = ""), reset, false)) {
+            PlayerModelUpdateEvent(player, modelID).call()
+        }
     }
 
 
     override fun removeModel() {
-        super.removeModel()
-        playerModel = ""
-        playerModelScale = 1.0
+        commitAppearance(appearanceState.copy(model = "", scale = 1.0, profileId = "", slots = emptyMap()), hostSelected = false)
     }
 
     fun addExtraModel(locator: String, modelID: String ) {
@@ -135,78 +160,179 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
 
 
     fun equipSuit(modelID: String, hide: Boolean = true) {
-        if (!PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.EQUIP_SUIT, null, modelID, hide).call()) return
-        costumeSlots.clear()
-        costumeSuit = modelID
-        costumeSuitHide = hide
-        broadcastCostume()
+        changeAfterLegacyEvent(
+            { it.copy(legacyCostume = LegacyCostumeState(modelID.takeIf { it.isNotEmpty() }, hide)) },
+            { PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.EQUIP_SUIT, null, modelID, hide).call() }
+        )
     }
 
     fun equipCostume(slot: CostumeSlot, modelID: String, hide: Boolean = false) {
-        if (!PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.EQUIP_SLOT, slot, modelID, hide).call()) return
-        costumeSuit = null
-        costumeSlots[slot] = modelID to hide
-        broadcastCostume()
+        changeAfterLegacyEvent({ state ->
+            val slots = LinkedHashMap(state.legacyCostume.slots)
+            if (modelID.isEmpty()) slots.remove(slot.id) else slots[slot.id] = LegacyCostumeEntry(modelID, hide)
+            state.copy(legacyCostume = LegacyCostumeState(slots = slots))
+        }, { PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.EQUIP_SLOT, slot, modelID, hide).call() })
     }
 
     fun removeCostume(slot: CostumeSlot) {
-        if (!PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.REMOVE_SLOT, slot, null, false).call()) return
-        costumeSuit = null
-        costumeSlots.remove(slot)
-        broadcastCostume()
+        changeAfterLegacyEvent({ state ->
+            val slots = LinkedHashMap(state.legacyCostume.slots).apply { remove(slot.id) }
+            state.copy(legacyCostume = LegacyCostumeState(slots = slots))
+        }, { PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.REMOVE_SLOT, slot, null, false).call() })
     }
 
     fun clearCostume() {
-        if (!PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.CLEAR, null, null, false).call()) return
-        costumeSuit = null
-        costumeSlots.clear()
-        broadcastCostume()
+        changeAfterLegacyEvent(
+            { it.copy(slots = emptyMap(), legacyCostume = LegacyCostumeState()) },
+            { PlayerCostumeChangeEvent(player, PlayerCostumeChangeEvent.Type.CLEAR, null, null, false).call() }
+        )
     }
 
-    private fun costumeSlotsDto(): Map<String, SPackCostume.Slot> =
-        costumeSlots.entries.associate { (slot, v) -> slot.id to SPackCostume.Slot(v.first, v.second) }
-
-    private fun broadcastCostume() {
-        val dto = costumeSlotsDto()
-        player.doWithSeenBy { NetworkMessageSender.sendCostume(it, player.uniqueId, costumeSuit, costumeSuitHide, dto) }
+    @JvmOverloads
+    fun setPlayerHost(modelID: String, profileId: String = "", scale: Double = 1.0): Boolean {
+        require(modelID.isNotBlank()) { "宿主模型 ID 不能为空" }
+        return commitAppearance(appearanceState.copy(model = modelID, scale = scale, variant = "DEFAULT_BBMODEL", profileId = profileId), hostSelected = true)
     }
 
+    @JvmOverloads
+    fun equipCostume(slotId: String, modelID: String, binding: PlayerHostBinding = PlayerHostBinding(), hide: PlayerHostHide? = null): Boolean {
+        HostProfileValidation.requireId(slotId)
+        val slots = LinkedHashMap(appearanceState.slots).apply { put(slotId, PlayerHostCostume(modelID, binding, hide)) }
+        return commitAppearance(appearanceState.copy(slots = slots))
+    }
 
-    private fun broadcastVariant() {
-        player.doWithSeenBy { NetworkMessageSender.sendPlayerVariant(it, player.uniqueId, variant.name) }
+    fun removeCostume(slotId: String): Boolean {
+        HostProfileValidation.requireId(slotId)
+        return commitAppearance(appearanceState.copy(slots = LinkedHashMap(appearanceState.slots).apply { remove(slotId) }))
+    }
+
+    /** Call on the server thread. Cancelling the event leaves every field unchanged. */
+    fun setAppearance(appearance: PlayerAppearance): Boolean = commitAppearance(appearance, hostSelected = appearance.isCustomHost())
+
+    fun updateAppearance(update: Consumer<PlayerAppearanceBuilder>): Boolean {
+        val builder = PlayerAppearanceBuilder(appearanceState)
+        update.accept(builder)
+        val next = builder.build()
+        return commitAppearance(next, hostSelected = if (builder.hostSelectionChanged) next.isCustomHost() else null)
+    }
+
+    private fun validateAppearance(candidate: PlayerAppearance): PlayerAppearance {
+        val next = candidate.validated()
+        if (next.profileId.isNotEmpty()) {
+            val profile = ArcartX.configs.playerHostProfiles.profile(next.profileId)
+                ?: throw IllegalArgumentException("玩家宿主配置不存在: ${next.profileId}")
+            require(profile["model"] == next.model) { "玩家宿主配置与模型不匹配" }
+        }
+        return next
+    }
+
+    private fun changeAfterLegacyEvent(change: (PlayerAppearance) -> PlayerAppearance, event: () -> Boolean,
+        resetBody: Boolean? = null, hostSelected: Boolean? = null): Boolean = commitLegacyAppearanceChange(
+        { appearanceState }, change, ::validateAppearance, event,
+        { commitAppearance(it, resetBody, hostSelected) }
+    )
+
+    private fun commitAppearance(candidate: PlayerAppearance, resetBody: Boolean? = null, hostSelected: Boolean? = null): Boolean {
+        val next = validateAppearance(candidate)
+        val previous = appearanceState
+        val nextHostSelection = hostSelected ?: explicitHostSelection
+        if (next == previous && nextHostSelection == explicitHostSelection && resetBody != true) return true
+        check(!appearanceCommitInProgress) { "不能在外观变更事件中再次提交外观" }
+        appearanceCommitInProgress = true
+        try {
+            if (!PlayerAppearanceChangeEvent(player, previous, next).call()) return false
+        } finally {
+            appearanceCommitInProgress = false
+        }
+        val previousDisplay = appearancePreview ?: previous
+        val previousHostSelection = explicitHostSelection
+        appearancePreview = null
+        AsteroidScheduler.cancelTask(tryModelTask)
+        tryModelTask = null
+        appearanceState = next
+        explicitHostSelection = nextHostSelection
+        appearanceRevision++
+        model = next.model
+        scale = next.scale
+        playerModel = next.model
+        playerModelScale = next.scale
+        variant = PlayerModelVariant.valueOf(next.variant)
+        animationPackId = next.packId
+        player.doWithSeenBy { sendAppearanceTo(it, previousDisplay, resetBody, previousHostSelection) }
+        return true
+    }
+
+    private fun sendAppearanceTo(target: Player, previous: PlayerAppearance? = null, resetBody: Boolean? = null,
+        previousHostSelection: Boolean = explicitHostSelection) {
+        val state = appearancePreview ?: appearanceState
+        val recipient = ArcartXEntityManager.getPlayer(target)
+        if (recipient?.supportsCustomPlayerHost() == true) {
+            val projection = state.forRenderRootsCapability(
+                PlayerHostCapabilities.COSTUME_RENDER_ROOTS in recipient.clientCapabilities)
+            NetworkMessageSender.sendPlayerAppearance(target, player.uniqueId, appearanceRevision, projection,
+                ArcartX.configs.playerHostProfiles.snapshot().revision, resetBody)
+            return
+        }
+        // Old clients can render the body geometry but cannot bind a configurable host skeleton.
+        val projection = state.legacyProjection(explicitHostSelection)
+        val previousProjection = previous?.legacyProjection(previousHostSelection)
+        val legacy = projection.costume
+        val previousLegacy = previousProjection?.costume
+        val legacyVariant = projection.variant
+        val oldVariant = previousProjection?.variant
+        val pack = projection.packId
+        val oldPack = previousProjection?.packId
+        if (previous == null || resetBody == true || state.model != previous.model || state.scale != previous.scale) {
+            NetworkMessageSender.setEntityModel(target, player.uniqueId, state.model, state.scale,
+                legacyAppearanceModelReset(resetBody, previous != null, state.model != previous?.model))
+        }
+        if (previous == null || legacy != previousLegacy) NetworkMessageSender.sendCostume(target, player.uniqueId,
+            legacy.suit, legacy.suitHide, legacy.slots.mapValues { SPackCostume.Slot(it.value.model, it.value.hide) })
+        if (previous == null || legacyVariant != oldVariant) NetworkMessageSender.sendPlayerVariant(target, player.uniqueId, legacyVariant)
+        if (previous == null || pack != oldPack) NetworkMessageSender.sendAnimationPack(target, player.uniqueId, pack)
+    }
+
+    fun syncAppearanceProfiles() {
+        player.doWithSeenBy {
+            if (ArcartXEntityManager.getPlayer(it)?.supportsCustomPlayerHost() == true) sendAppearanceTo(it)
+        }
+    }
+
+    override fun syncModelOnStartSeenBy(target: Player) {
+        sendAppearanceTo(target)
     }
 
 
 
     fun setDefaultModel(scale: Double = 1.0) {
-        if (!PlayerVariantChangeEvent(player, PlayerModelVariant.DEFAULT_BBMODEL).call()) return
-        this.variant = PlayerModelVariant.DEFAULT_BBMODEL
-        setModel("__default_player__", scale)
-        broadcastVariant()
+        if (changeAfterLegacyEvent(
+                { it.copy(model = "__default_player__", scale = scale, variant = "DEFAULT_BBMODEL", profileId = "") },
+                { PlayerVariantChangeEvent(player, PlayerModelVariant.DEFAULT_BBMODEL).call() }, true, false)) {
+            PlayerModelUpdateEvent(player, "__default_player__").call()
+        }
     }
 
     fun setCustomModel(modelID: String, scale: Double = 1.0) {
-        if (!PlayerVariantChangeEvent(player, PlayerModelVariant.CUSTOM_BBMODEL).call()) return
-        this.variant = PlayerModelVariant.CUSTOM_BBMODEL
-        setModel(modelID, scale)
-        broadcastVariant()
+        if (changeAfterLegacyEvent(
+                { it.copy(model = modelID, scale = scale, variant = "CUSTOM_BBMODEL", profileId = "") },
+                { PlayerVariantChangeEvent(player, PlayerModelVariant.CUSTOM_BBMODEL).call() }, true, false)) {
+            PlayerModelUpdateEvent(player, modelID).call()
+        }
     }
 
-
-    private fun broadcastAnimationPack() {
-        player.doWithSeenBy { NetworkMessageSender.sendAnimationPack(it, player.uniqueId, animationPackId) }
-    }
 
     fun setAnimationPack(packId: String) {
-        if (!PlayerAnimationPackChangeEvent(player, packId).call()) return
-        this.animationPackId = packId
-        broadcastAnimationPack()
+        changeAfterLegacyEvent(
+            { it.copy(packId = packId) },
+            { PlayerAnimationPackChangeEvent(player, packId).call() }
+        )
     }
 
     fun clearAnimationPack() {
-        if (!PlayerAnimationPackChangeEvent(player, "").call()) return
-        this.animationPackId = ""
-        broadcastAnimationPack()
+        changeAfterLegacyEvent(
+            { it.copy(packId = "") },
+            { PlayerAnimationPackChangeEvent(player, "").call() }
+        )
     }
 
     fun playFirstPersonAnimationByTime(animation: String, speed: Double, keepTime: Int){
@@ -223,18 +349,6 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
         NetworkMessageSender.sendSetController(target,player.uniqueId , controller?:"")
         extraModels.forEach { (key, value) ->
             NetworkMessageSender.sendAddExtraModel(target, player.uniqueId, key, value)
-        }
-        // 新观察者进入视野时，补发当前时装(运行时内存态，无 DB)
-        if (costumeSuit != null || costumeSlots.isNotEmpty()) {
-            NetworkMessageSender.sendCostume(target, player.uniqueId, costumeSuit, costumeSuitHide, costumeSlotsDto())
-        }
-        // 补发当前变体(仅非默认；DEFAULT 是客户端默认值，无需下发)
-        if (variant != PlayerModelVariant.DEFAULT_BBMODEL) {
-            NetworkMessageSender.sendPlayerVariant(target, player.uniqueId, variant.name)
-        }
-        // 补发当前动画包(仅非空)
-        if (animationPackId.isNotEmpty()) {
-            NetworkMessageSender.sendAnimationPack(target, player.uniqueId, animationPackId)
         }
         // 新观察者进入视野时，补发当前飞行态
         NetworkMessageSender.sendFlyingState(target, player.uniqueId, player.isFlying)
@@ -256,11 +370,39 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
 
 
     fun tryModel(modelID: String, scale: Double, time: Long){
-        super.setModel(modelID, scale)
+        require(time >= 0) { "试穿时间不能为负数" }
+        // A body-only projection avoids attaching the current host's bones/slots to a different rig.
+        val preview = PlayerAppearance(model = modelID, scale = scale, variant = "CUSTOM_BBMODEL").validated()
+        val previous = appearancePreview ?: appearanceState
+        check(!appearanceCommitInProgress) { "不能在外观变更事件中再次提交外观" }
+        appearanceCommitInProgress = true
+        try {
+            if (!PlayerAppearanceChangeEvent(player, previous, preview).call()) return
+        } finally {
+            appearanceCommitInProgress = false
+        }
+        appearancePreview = preview
+        appearanceRevision++
+        model = preview.model
+        this.scale = preview.scale
+        player.doWithSeenBy { sendAppearanceTo(it, previous, true) }
         AsteroidScheduler.cancelTask(tryModelTask)
         tryModelTask = AsteroidScheduler.runTaskLater(bukkitPlugin, Runnable {
-            super.setModel(playerModel, playerModelScale)
+            val displayed = appearancePreview ?: return@Runnable
+            appearancePreview = null
+            model = appearanceState.model
+            this.scale = appearanceState.scale
+            appearanceRevision++
+            tryModelTask = null
+            player.doWithSeenBy { sendAppearanceTo(it, displayed, true) }
         }, time / 50)
+    }
+
+    fun closeAppearance() {
+        AsteroidScheduler.cancelTask(tryModelTask)
+        tryModelTask = null
+        appearancePreview = null
+        clientCapabilities = emptySet()
     }
 
 
@@ -317,12 +459,19 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
     }
 
     fun syncSlotCacheToClient(){
-        slotCache.forEach { (slotID, itemStack) ->
-            setSlotItemStackOnlyClient(slotID, itemStack)
-            PlayerExtraSlotUpdateEvent(player,slotID,itemStack).call()
-            ArcartX.configs.slotFolder.setting[slotID]?.updateScriptArgs?.let {
-                it.forEach{ arg ->
-                    ScriptManager.executeScript(arg.first, player, itemStack,arg.second)
+        slotCacheSyncSteps().forEach { it.invoke() }
+    }
+
+    /** 固定槽位 ID，实际轮到该槽位时读取当前物品，避免延迟同步恢复已经移除的物品。 */
+    internal fun slotCacheSyncSteps(): Sequence<() -> Unit> {
+        val slots = slotCache.keys.toList()
+        return slots.asSequence().map { slotID ->
+            step@{
+                val itemStack = slotCache[slotID] ?: return@step
+                setSlotItemStackOnlyClient(slotID, itemStack)
+                PlayerExtraSlotUpdateEvent(player, slotID, itemStack).call()
+                ArcartX.configs.slotFolder.setting[slotID]?.updateScriptArgs?.forEach { arg ->
+                    ScriptManager.executeScript(arg.first, player, itemStack, arg.second)
                 }
             }
         }
@@ -521,6 +670,10 @@ class ArcartXPlayer(val player: Player) : ArcartXEntity(player){
 
     enum class PlayerModelVariant {
         DEFAULT_BBMODEL, CUSTOM_BBMODEL
+    }
+
+    companion object {
+        const val CUSTOM_PLAYER_HOST_CAPABILITY = PlayerHostCapabilities.CUSTOM_PLAYER_HOST
     }
 
 

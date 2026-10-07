@@ -13,6 +13,7 @@ import com.google.gson.annotations.SerializedName
 import org.bukkit.entity.Player
 import priv.seventeen.artist.arcartx.ArcartX
 import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
+import priv.seventeen.artist.arcartx.core.playerhost.PlayerHostCapabilities
 import priv.seventeen.artist.arcartx.language.AXLanguageKey
 import priv.seventeen.artist.arcartx.language.L
 import priv.seventeen.artist.arcartx.commons.message.ArcartXSender.Companion.sendMessage
@@ -38,6 +39,9 @@ class CPackConnection : ClientPacket {
     @SerializedName("resource")
     private val resource: Map<String, String> = HashMap()
 
+    @SerializedName("capabilities")
+    private val capabilities: List<String?>? = null
+
     override fun handle(player: Player) {
         val playerEntity = ArcartXEntityManager.getPlayer(player) ?: return
 
@@ -45,6 +49,7 @@ class CPackConnection : ClientPacket {
         val msg = message
         if (msg.isNullOrBlank() || msg.length > MAX_KEY_LENGTH) return
         if (code.size > MAX_CODE_ENTRIES || resource.size > MAX_RESOURCE_ENTRIES) return
+        val supported = PlayerHostCapabilities.parse(capabilities) ?: return
 
         // 初始化加密器
         val secretKey = createSecretKey(playerEntity.key)
@@ -58,6 +63,7 @@ class CPackConnection : ClientPacket {
         if (!checkCrc64(player, crc64List)) {
             return
         }
+        playerEntity.setClientCapabilities(supported)
 
         // 资源文件检测与同步
         sendOrUpdate(player)

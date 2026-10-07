@@ -15,6 +15,7 @@ import priv.seventeen.artist.arcartx.core.entity.ArcartXEntityManager
 import priv.seventeen.artist.arcartx.event.client.ClientEntityJoinEvent
 import priv.seventeen.artist.arcartx.event.client.ClientInitializedEvent
 import priv.seventeen.artist.arcartx.network.NetworkMessageSender
+import priv.seventeen.artist.arcartx.network.OutgoingPacketDispatcher
 import java.util.*
 
 /** 客户端初始化完成包 */
@@ -30,12 +31,16 @@ class CPackInitialized : ClientPacket {
         if(reload){
             ClientInitializedEvent.Reload(player).call()
         } else {
-            NetworkMessageSender.sendWorldChange(player, player.world)
-            entities.forEach {
-                ClientEntityJoinEvent(player, it).call()
-            }
-            ArcartXEntityManager.getPlayer(player)?.syncSlotCacheToClient()
-            ClientInitializedEvent.End(player).call()
+            val connection = OutgoingPacketDispatcher.connection(player) ?: return
+            val visibleEntities = entities.toList()
+            val world = player.world
+            connection.submitInitialization(sequence<() -> Unit> {
+                yield { NetworkMessageSender.sendWorldChange(player, world) }
+                for (entity in visibleEntities) {
+                    yield { ClientEntityJoinEvent(player, entity).call() }
+                }
+                ArcartXEntityManager.getPlayer(player)?.let { yieldAll(it.slotCacheSyncSteps()) }
+            }.iterator()) { ClientInitializedEvent.End(player).call() }
         }
     }
 

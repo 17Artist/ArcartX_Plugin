@@ -93,10 +93,19 @@ internal object OutgoingPacketDispatcher {
             encoderExecutor = workers,
             deliveryExecutor = Executor(::scheduleDelivery),
             send = { frame -> player.sendPluginMessage(bukkitPlugin, NetworkManager.CHANNEL, frame) },
-            onFailure = { error -> BlinkLog.error("向玩家 ${player.name} 发送数据失败", error) }
+            onFailure = { error -> BlinkLog.error("向玩家 ${player.name} 发送数据失败", error) },
+            onBacklog = { backlog ->
+                BlinkLog.warn("玩家 ${player.name} 的待发送数据较多（${backlog.packets} 个包，" +
+                    "约 ${backlog.bytes / 1024} KiB），正在分批发送。")
+            }
         )
 
         fun submit(packet: OutgoingPacket) = queue.submit(packet)
+
+        val isPreparingInitialization: Boolean get() = queue.isPreparingInitialization
+
+        fun submitInitialization(steps: Iterator<() -> Unit>, completion: () -> Unit) =
+            queue.submitInitialization(steps, completion)
 
         private fun scheduleDelivery(task: Runnable) {
             if (!bukkitPlugin.isEnabled) {

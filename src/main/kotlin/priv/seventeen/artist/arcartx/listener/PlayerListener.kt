@@ -97,6 +97,7 @@ fun onPlayerChangeWorld(event: PlayerChangedWorldEvent){
 @AutoListener(priority = EventPriority.LOWEST)
 fun onPlayerLeaveServer(event: PlayerQuitEvent){
     OutgoingPacketDispatcher.disconnect(event.player)
+    event.player.arcartXHandler?.closeAppearance()
     ArcartXEntityManager.removePlayer(event.player)
     ArcartXEditorManager.removeEditorData(event.player.uniqueId)
 }

@@ -1,0 +1,97 @@
+# 玩家自定义宿主配置
+# 下面两份示例默认不生效。使用时删除 root: {}，只取消所需示例配置行开头的「# 」，保留缩进。
+# 同一文件只保留一个 root；需要多份配置时，将它们放在同一个 root 下，配置 ID 不能重复。
+# model、骨骼名和定位器名都需要改成客户端资源中的实际名称，大小写必须一致。
+# 重载配置后，通过 setPlayerHost(modelID, 配置ID, scale) 应用。
+root: {}
+
+# 示例一：完整配置。模型本身没有 player_host axmeta 时，也可以在这里声明全部宿主设置。
+# 这里的配置 ID 是 hero，模型 ID 是 player/hero。
+# root:
+#   hero:
+#     schema: 1
+#     model: player/hero
+#     parts:
+#       HEAD: [skull, hair_base]
+#       BODY: [torso, arm_l, arm_r]
+#       LEGS: [leg_l, leg_r]
+#       FEET: [boot_l, boot_r]
+#     semantic_bones:
+#       head: skull
+#       body: torso
+#       left_arm: arm_l
+#       right_arm: arm_r
+#       left_leg: leg_l
+#       right_leg: leg_r
+#     locators:
+#       left_hand:
+#         bone: arm_l
+#         locator: grip_l
+#       right_hand:
+#         bone: arm_r
+#         locator: grip_r
+#       elytra:
+#         bone: torso
+#         locator: wings
+#     slots:
+#       hair:
+#         label: 头发
+#         order: 10
+#         default_hide:
+#           bones: [hair_base]
+#       face:
+#         label: 脸饰
+#         order: 20
+#         default_hide:
+#           parts: []
+#           bones: []
+#       clothes:
+#         label: 衣服
+#         order: 30
+#         default_hide:
+#           parts: [BODY]
+#       decoration:
+#         label: 装饰
+#         order: 40
+#         default_hide:
+#           parts: []
+#           bones: []
+
+# parts 指定部位的根骨；没有单独分类的子骨继承最近的部位声明，无需逐个列出。
+# 子骨单独声明了其它部位时，以子骨的声明为准。隐藏 BODY 不会把单独分类的 HEAD 一起隐藏。
+# 同一骨骼不能重复归属。自身和父链都未分类的骨骼归入 OTHER，不要在 parts 中填写 OTHER。
+# semantic_bones 用于对应动画事件中的部位名称，不自动追加头部 yaw/pitch。
+# locators 必须填写骨骼上真实存在的定位器；若模型已有唯一的标准定位器名，可省略对应别名。
+# 鞘翅使用 elytra 或 elytra_left、elytra_right 二选一，不能同时配置。
+# slots 的 ID 可自由命名，使用小写字母开头；中文名称填写在 label 中。
+# order 越小越先渲染，相同数值按槽位 ID 排序。
+# default_hide 在该槽位穿戴有效时装后生效；parts 可用 HEAD/BODY/LEGS/FEET/OTHER，bones 填精确骨骼名。
+# parts 隐藏整个部位；bones 只隐藏所列骨骼自身的几何，hair_base 不会扩大为整颗头。
+# 整套衣服覆盖上身、下身和鞋时，衣服槽可改为 parts: [BODY, LEGS, FEET]；这里只演示上衣。
+# API 的 hide 未填写时先使用 default_hide；两者都未配置时，mapped 按选中几何的绑定自动隐藏覆盖骨骼。
+# 显式 hide 完全覆盖默认设置。空 default_hide（parts: []、bones: []）或空 PlayerHostHide 表示不隐藏。
+# attach 不自动隐藏锚点；帽子、脸饰、装饰若保留宿主几何，按上面的空隐藏设置填写。
+# 多个有效槽位的隐藏范围取并集，卸下后恢复；CPU/GPU 一致，隐藏不会停止动画或定位器。
+# 这里只声明宿主与槽位。穿什么时装、使用 attach 还是 mapped 绑定，由 equipCostume API 指定。
+# 调用示例（Java，player 为 Bukkit 玩家；时装模型需匹配此宿主骨架）：
+# ArcartXAPI.getEntityManager().getPlayer(player).setPlayerHost("player/hero", "hero", 1.0);
+# ArcartXAPI.getEntityManager().getPlayer(player).equipCostume("clothes", "costume/hero_coat");
+
+# 示例二：只覆盖模型 axmeta 中的一部分字段。
+# hero_light 是独立配置，只继承 player/hero 的 axmeta，不会继承上面的 hero。
+# 下面取消衣服槽的默认隐藏，其余骨骼分类、定位器和槽位继续使用模型 axmeta。
+# root:
+#   hero_light:
+#     model: player/hero
+#     slots:
+#       clothes:
+#         label: 外套
+#         order: 30
+#         default_hide:
+#           parts: []
+#           bones: []
+
+# 调用：ArcartXAPI.getEntityManager().getPlayer(player).setPlayerHost("player/hero", "hero_light", 1.0);
+# 未填写的字段继承模型 axmeta；列表整体替换，映射按键合并，空映射 {} 不会清空继承项。
+# 显式填写 parts: []、bones: [] 才会将对应隐藏列表清空。
+# 此 YAML 不支持用 null 删除字段；通过运行时 register API 传入映射时才可使用 null 删除标记。

@@ -13,6 +13,7 @@ import org.bukkit.World
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import priv.seventeen.artist.arcartx.ArcartX
+import priv.seventeen.artist.arcartx.core.playerhost.PlayerAppearance
 import priv.seventeen.artist.arcartx.core.config.camera.CameraElement
 import priv.seventeen.artist.arcartx.core.config.card.ChatCard
 import priv.seventeen.artist.arcartx.core.config.ui.type.UI
@@ -94,6 +95,13 @@ object NetworkMessageSender {
 
     fun sendAnimationPack(player: Player, target: UUID, packId: String) {
         sendPacketSync(player, MessageID.Server.ANIMATION_PACK, DecodeType.NORMAL, SPackAnimationPack(target, packId))
+    }
+
+    @JvmOverloads
+    fun sendPlayerAppearance(player: Player, target: UUID, revision: Long, appearance: PlayerAppearance,
+        profileRevision: Long, resetBody: Boolean? = null) {
+        sendPacketSync(player, MessageID.Server.PLAYER_APPEARANCE, DecodeType.NORMAL,
+            SPackPlayerAppearance(target, revision, appearance, profileRevision, resetBody))
     }
 
 
@@ -598,19 +606,28 @@ object NetworkMessageSender {
         return idCounter.getAndIncrement()
     }
 
+    /** 在玩家线程生成快照并按连接顺序排队；返回不代表已经投递，初始化期间不会越过初始化批次。 */
     fun sendPacketSync(player: Player, messageID: MessageID, decodeType: DecodeType, packet: ServerPacket) {
         val connection = OutgoingPacketDispatcher.connection(player) ?: return
         val prepare = Runnable { preparePacket(connection, messageID, decodeType, packet) }
-        if (AsteroidScheduler.isFolia()) {
+        if (connection.isPreparingInitialization) {
+            // 初始化回调已经位于玩家线程；再次调度会使包逃出当前批次并破坏顺序。
+            prepare.run()
+        } else if (AsteroidScheduler.isFolia()) {
             AsteroidScheduler.runEntityTask(bukkitPlugin, player, prepare)
         } else {
             bukkitPlugin.ensureMainThread(prepare)
         }
     }
 
+    /** 初始化回调内按调用顺序生成快照，其余调用异步生成；编码和压缩始终在后台执行。 */
     fun sendPacketAsync(player: Player, messageID: MessageID, decodeType: DecodeType, packet: ServerPacket) {
         val connection = OutgoingPacketDispatcher.connection(player) ?: return
-        bukkitPlugin.ensureAsyncThread { preparePacket(connection, messageID, decodeType, packet) }
+        if (connection.isPreparingInitialization) {
+            preparePacket(connection, messageID, decodeType, packet)
+        } else {
+            bukkitPlugin.ensureAsyncThread { preparePacket(connection, messageID, decodeType, packet) }
+        }
     }
 
 

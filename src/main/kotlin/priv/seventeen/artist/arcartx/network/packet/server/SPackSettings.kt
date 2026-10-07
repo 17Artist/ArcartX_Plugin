@@ -10,6 +10,8 @@
 package priv.seventeen.artist.arcartx.network.packet.server
 
 import com.google.gson.annotations.SerializedName
+import com.google.gson.annotations.JsonAdapter
+import priv.seventeen.artist.arcartx.core.playerhost.PlayerHostProfileMapAdapter
 import priv.seventeen.artist.arcartx.ArcartX
 import priv.seventeen.artist.arcartx.core.chatcard.ArcartXChatCardRegistry
 import priv.seventeen.artist.arcartx.core.config.animation.Controller
@@ -35,6 +37,16 @@ import priv.seventeen.artist.arcartx.core.controller.ControllerRegistry
 import priv.seventeen.artist.arcartx.core.ui.ArcartXUIRegistry
 
 class SPackSettings : ServerPacket {
+
+    @Transient
+    private val hostRegistry = ArcartX.configs.playerHostProfiles.snapshot()
+
+    @SerializedName("player_host_profiles")
+    @JsonAdapter(PlayerHostProfileMapAdapter::class)
+    private val playerHostProfiles: Map<String, Map<String, Any?>> = hostRegistry.profiles
+
+    @SerializedName("player_host_registry_revision")
+    private val playerHostRegistryRevision: Long = hostRegistry.revision
 
     @SerializedName("title")
     private val title: String = ArcartX.configs.setting.title

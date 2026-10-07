@@ -24,7 +24,7 @@ abstract class ClientInitializedEvent(val player: Player) : ArcartXEvent(allowCa
         override fun getHandlers() = handlerList
     }
 
-
+    /** 首次实体、槽位数据的所有分片投递后触发；可能延后多个 tick，不代表客户端已处理完毕。 */
     class End(player: Player) : ClientInitializedEvent(player) {
         companion object {
             @JvmStatic

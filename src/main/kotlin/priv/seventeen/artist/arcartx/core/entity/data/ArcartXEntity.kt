@@ -55,10 +55,11 @@ open class ArcartXEntity(val entity: Entity) {
      }
 
     /**
-     * 为该实体设置模型，并可指定是否重置客户端既有模型状态（动画/绑定等）。
+     * 为该实体设置模型，并可指定是否主动清除客户端既有模型状态。
+     * reset=false 不主动清除状态；资源变化时必要的绑定重建仍会执行，不保证跨骨架动作续播。
      * @param modelID 模型 ID
      * @param scale 缩放
-     * @param reset 为 true 时通知客户端先重置该实体的现有模型再应用新模型
+     * @param reset 是否请求重置，false 保留已有状态；不同模型资源仍需进行必要的绑定重建
      */
     open fun setModel(modelID: String, scale: Double, reset: Boolean) {
         this.model = modelID
@@ -150,7 +151,7 @@ open class ArcartXEntity(val entity: Entity) {
 
 
     open fun startSeenBy(target: Player) {
-        if(this.model.isNotEmpty()) NetworkMessageSender.setEntityModel(target, uniqueId, model, scale)
+        syncModelOnStartSeenBy(target)
         if (size.first > 0 && size.second > 0) {
             NetworkMessageSender.sendEntitySize(target, uniqueId, size.first, size.second)
         }
@@ -166,6 +167,10 @@ open class ArcartXEntity(val entity: Entity) {
         if (glowEnable) NetworkMessageSender.sendEntityGlowEnable(target, uniqueId)
         if(!displayName) NetworkMessageSender.sendHideName(target, uniqueId, true)
         if(hideHitBox) NetworkMessageSender.setEntityHitBoxHide(target, uniqueId, true)
+    }
+
+    protected open fun syncModelOnStartSeenBy(target: Player) {
+        if (model.isNotEmpty()) NetworkMessageSender.setEntityModel(target, uniqueId, model, scale)
     }
 
     fun syncSize(){
